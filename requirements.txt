@@ -1,0 +1,16 @@
+biopython
+networkx
+python-igraph
+scipy
+requests
+lxml
+pandas
+configparser
+flatten-dict
+numpy
+#python-igraph en windows seguir https://stackoverflow.com/questions/34113151/how-to-install-igraph-for-python-on-windows
+gtk3
+pygobject
+matplotlib
+graph-tool
+beautifulsoup4

@@ -2,38 +2,65 @@ import numpy as np
 from Bio import pairwise2
 import operator
 from pyprot.structure import StructureModel
+import Bio
 
 
 class Protein:
     def __init__(self, pdb):
         self.pdb = pdb
-        self.model = None
-        self.aminoacids = {'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F', 'GLY': 'G', 'HIS': 'H',
-                      'ILE': 'I', 'LYS': 'K', 'LEU': 'L', 'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q',
-                      'ARG': 'R', 'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'}
-        self.atoms = self.get_atoms_()
-        ca_atoms = np.array([atom.coord for atom in self.get_atoms_()
-                             if atom.name == "CA" and atom.full_id[2] == "A"])
-        self.structure = StructureModel(ca_atoms)
+        self.aminoacids = {'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E',
+                           'PHE': 'F', 'GLY': 'G', 'HIS': 'H', 'ILE': 'I',
+                           'LYS': 'K', 'LEU': 'L', 'MET': 'M', 'ASN': 'N',
+                           'PRO': 'P', 'GLN': 'Q', 'ARG': 'R', 'SER': 'S',
+                           'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'}
+        #self.atoms = self._get_atoms()
+        self.structure = None
 
+    @property
+    def pdb(self):
+        return self.__pdb
 
-    def get_atoms_(self):
+    @pdb.setter
+    def pdb(self, pdb):
+        assert isinstance(pdb, Bio.PDB.Structure.Structure), """A Bio.PDB.Structure.Structure must be used"""
+        self.__pdb = pdb
+
+    @pdb.deleter
+    def pdb(self):
+        del self.__pdb
+
+    def generate_structure(self, points):
+        self.structure = StructureModel(points)
+
+    def get_atoms(self, atom_as_dict=True, filter_atoms=lambda x: True,
+                  filter_attr=lambda x: x):
         """
         Get atoms from PDB
         :return: list of atoms
         """
-        atoms = [i for i in self.pdb.get_atoms()]
+        if atom_as_dict:
+            atoms = [filter_attr(atom.__dict__) for atom in
+                     self.pdb.get_atoms() if filter_atoms(atom.__dict__)]
+        else:
+            atoms = [filter_attr(atom) for atom in
+                     self.pdb.get_atoms() if filter_atoms(atom)]
         return atoms
 
-    def get_residues_(self):
+    def get_residues(self, res_as_dict=True, filter_res=lambda x: True,
+                     filter_attr=lambda x: x):
         """
-        Get residues from PDB
-        :return: list of residues
+        Get atoms from PDB
+        :return: list of atoms
         """
-        residues = [i for i in self.pdb.get_residues()]
-        return residues
+        if res_as_dict:
+            atoms = [filter_attr(res.__dict__) for res in
+                     self.pdb.get_residues() if filter_res(res.__dict__)]
+        else:
+            atoms = [filter_attr(res) for res in
+                     self.pdb.get_residues() if filter_res(res)]
+        return atoms
 
-    def get_bfactor_by_atom_(self):
+    def _get_bfactor_by_atom(self):
         """
         Get bfactor data
         :return: list of list of dicts, where each dict represents information of an atom and the list
@@ -44,7 +71,7 @@ class Protein:
                    self.pdb.get_residues()]
         return bfactor
 
-    def get_avg_bfactor_by_residue_(self):
+    def _get_avg_bfactor_by_residue(self):
         """
         Get average bfactor by residue
         :return: list of dicts where each dict represents a residue
@@ -68,12 +95,12 @@ class Protein:
             thelines = [x for x in thelines if len(x) == 14]
         if not thelines:
             return None
-        seqSelf = ''.join([self.aminoacids[r.resname] for r in self.get_residues_() if r.resname in
+        seqSelf = ''.join([self.aminoacids[r.resname] for r in self._get_residues() if r.resname in
                            self.aminoacids.keys() and r.parent.id in chain_list])
         seqCS = ''.join([y[1].lstrip() for y in thelines])
         alignment = max(pairwise2.align.globalxx(seqSelf, seqCS), key=operator.itemgetter(1))
         seqSelf, seqCS, _, _, _ = alignment
-        enumres = enumerate([r for r in self.get_residues_() if r.resname in
+        enumres = enumerate([r for r in self._get_residues() if r.resname in
                              self.aminoacids.keys() and r.parent.id in chain_list])
         thelines.reverse() # to pop() first element first
         prot_conservation = []

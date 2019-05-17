@@ -28,7 +28,7 @@ class StructureModel:
     def points(self, points):
         assert isinstance(points, np.ndarray), """A Numpy array matrix must be
                                                         used for points"""
-        return self.__points
+        self.__points = points
 
     @points.deleter
     def points(self):

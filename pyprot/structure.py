@@ -8,6 +8,7 @@ import networkx as nx
 from pyprot.io import Writer
 import pyprot
 
+
 class StructureModel:
 
     def __init__(self, points, graph_id="structure"):

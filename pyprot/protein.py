@@ -44,7 +44,7 @@ class Protein:
         else:
             atoms = [filter_attr(atom) for atom in
                      self.pdb.get_atoms() if filter_atoms(atom)]
-        return atoms
+        return np.array(atoms)
 
     def get_residues(self, res_as_dict=True, filter_res=lambda x: True,
                      filter_attr=lambda x: x):

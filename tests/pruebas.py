@@ -5,13 +5,13 @@ from pyprot.structure import Perseus
 import numpy as np
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
-
+import gc
+gc.collect()
 parser = PDBParser()
 pdb = parser.get_structure("1a3z","/home/usuario/Documentos/github/pyprot/tests/1A3Z.pdb")
 type(pdb)
 
 prot = Protein(pdb)
-prot.pdb.__setattr__
 
 
 prot.get_residues(filter_attr=lambda x: x["resname"], res_as_dict=True, filter_res=lambda x: x["resname"] == "HOH")
@@ -37,9 +37,14 @@ class OurClass:
 x = OurClass(10000000)
 x.OurAtt
 
-res = np.array([r for r in prot._get_residues()])
-struc = StructureModel([1,2,3])
-struc
+atoms = prot.get_atoms(filter_attr=lambda x: x.coord,filter_atoms=lambda x: x.name == "CA", atom_as_dict=False)
+#atoms = [list(i.coord) for i in prot.pdb.get_atoms()]
+
+struc = StructureModel(atoms)
+
+
+
+
 per = Perseus()
 sutr = per.calculate_fatcore(prot)
 

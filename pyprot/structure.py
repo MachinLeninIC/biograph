@@ -7,13 +7,33 @@ import subprocess
 import networkx as nx
 from pyprot.io import Writer
 import pyprot
+import matplotlib.pyplot as plt
+import pandas as pd
 
 
 class StructureModel:
+    """StructureModel is a 3D representation of a protein. It has different
+    tools to model and visualize the surface.
 
-    def __init__(self, points, graph_id="structure"):
+    Parameters
+    ----------
+    points : list or list-like
+        List or list-like of lists in which each element has three coordinates.
+
+    Attributes
+    ----------
+    points : list or list-like
+        List or list-like of lists in which each element has three coordinates.
+    simplices_order : np.ndarray
+        Order of simplices as computed by Delaunay
+    persistent_hom_params : dict
+        Dict to store the result of persistent homology parameters
+    delaunay : scipy.spatial.Delaunay
+        Delaunay object used for triangulation of points.
+    """
+
+    def __init__(self, points):
         self.__points = points
-        self.graph_id = graph_id
         self.simplices_order = None
         self.persistent_hom_params = {}
         self.delaunay = None
@@ -73,15 +93,13 @@ class StructureModel:
                 combs = chain.from_iterable(combinations(list(range(4)), 2))
                 pair_indices = np.fromiter(combs, int, count=12)
                 pair_indices = pair_indices.reshape(6, 2).T
-                points_diff = self.points[self.delaunay.simplices][:, pair_indices[0]] - \
-                                                 self.points[self.delaunay.simplices][:, pair_indices[1]]
+                points_diff = self.points[self.delaunay.simplices][:, pair_indices[0]] - self.points[self.delaunay.simplices][:, pair_indices[1]]
                 simplices_sizes = np.sort(np.linalg.norm(points_diff, axis=-1),
                                           axis=1)
                 # Lexicographic comparison
                 simplices_order = np.lexsort(simplices_sizes.T)
         else:
             simplices_order = order
-
         self.simplices_order = simplices_order
 
     def diffuse(self, diffuser_matrix, steps=1):
@@ -264,7 +282,7 @@ class StructureModel:
 
         Returns
         -------
-        np.Array
+        numpy.Array
             Array of simplices.
 
         """
@@ -274,23 +292,6 @@ class StructureModel:
     def _step_to_length(self, i):
         # TODO: check
         return max(self.edge_size(self.delaunay.simplices[self.simplices_order[i]]))
-
-    @staticmethod
-    def read_betti(betti_filename, step=None):
-        # TODO: move to other module
-        """
-        Reads a Betti file
-        :param betti_filename: str, betti file path
-        :param fat_step:
-        :param step:
-        :return:
-        """
-        ifile = open(betti_filename)
-        betti = [list(map(int, x.split())) for x in ifile.readlines() if
-                 x.split()]
-        ifile.close()
-        betti = [x for x in betti if x[0] <= step]
-        return betti
 
     @staticmethod
     def get_faces(simplices):
@@ -328,11 +329,70 @@ class StructureModel:
         """
         return np.unique(simplices)
 
+    def plot(self, step, view_position, view_init_elev=20, view_init_azim=35,
+             cmap="viridis"):
+        """Plot surface of structure.
+
+        Parameters
+        ----------
+        step : int
+            step in the Delaunay triangulation to define surface. To plot the
+            surface the simplices until that step will be used.
+        view_position : int
+            Used predefined position to view the surface. The following
+            positions are available:
+        view_init_elev : int
+            If you want a personalized view position you can set the elevation
+            using this parameter, it is then passed to matplotlib3d api,
+            view_init function. First, you need to set view_position = 0.
+        view_init_azim : int
+            If you want a personalized view position you can set the azimuth
+            using this parameter, it is then passed to matplotlib3d api,
+            view_init function. First, you need to set view_position = 0.
+        cmap : str
+            `cmap` used to color the plot.
+
+        Returns
+        -------
+        None
+        """
+        if view_position == 0:
+            None
+        elif view_position == 1:
+            view_init_elev, view_init_azim = 35, 0
+        elif view_position == 2:
+            view_init_elev, view_init_azim = 35, 45
+        elif view_position == 3:
+            view_init_elev, view_init_azim = 35, 90
+        elif view_position == 4:
+            view_init_elev, view_init_azim = 35, 135
+        elif view_position == 5:
+            view_init_elev, view_init_azim = 35, 180
+        elif view_position == 6:
+            view_init_elev, view_init_azim = 35, 225
+        elif view_position == 7:
+            view_init_elev, view_init_azim = 35, 270
+        elif view_position == 8:
+            view_init_elev, view_init_azim = 35, 315
+        else:
+            raise Exception("View not implemented")
+        triangles = self.get_simplices_by_step(step)
+        ax = plt.axes(projection='3d')
+        ax.view_init(view_init_elev, view_init_azim)
+        ax.plot_trisurf(self.points[:, 0] , self.points[:, 1],
+                        self.points[:, 2], triangles=triangles, cmap=cmap)
+
 
 class Perseus:
+    """ Class that wraps the usage of Perseus command line interface. With
+    Perseus a persistent homology-based approach is used to model the surface
+    and core of proteins. In addition, this can be used to model de depth of
+    a given residue in the protein.
+
+    """
     def __init__(self):
         MODULEDIR = os.path.dirname(os.path.abspath(__file__))
-        self.PERSEUSPATH = os.path.join(MODULEDIR, "perseus", "perseus")
+        self.__perseuspath = os.path.join(MODULEDIR, "perseus", "perseus")
 
     def calculate_fatcore(self, structure, topology=(1, 0, 0),
                           perseus_input_filename="ordered_simplices.pers",
@@ -378,7 +438,7 @@ class Perseus:
                 axis=1)
             np.savetxt(ofile, input, delimiter=' ', newline='\n', fmt='%i')
         min_step = structure._get_min_steps(order=structure.simplices_order)
-        to_run = (self.PERSEUSPATH, 'simtop',
+        to_run = (self.__perseuspath, 'simtop',
                   os.path.join(dir_path, perseus_input_filename),
                   os.path.join(dir_path, "perseus_output"))
         popen = subprocess.Popen(to_run, stdout=subprocess.PIPE)
@@ -417,3 +477,38 @@ class Perseus:
             structure_.persistent_hom_params["fat_step"] = fat_step
             structure_.persistent_hom_params["big_step"] = big_step
         return structure_
+
+    @staticmethod
+    def read_betti(betti_filename, step):
+        """Short summary.
+
+        Parameters
+        ----------
+        betti_filename : str
+            full path to betti file
+        step : int
+            step until which read the file
+
+        Returns
+        -------
+        pandas DataFrame
+            Output of Perseus' simtop. For example, a line in the file can be
+            12 14 4 7 0
+            which indicates that when all the cells with birth time less than
+            or equal to 12 are included, then there are 14 connected components
+            4 tunnels, 7 cavities and no higher dimensional generators of
+            homology. The numbers 14, 4 and 7 in this context are called the
+            zeroth, first and second Betti numbers of the 12-th subcomplex in
+            the persistence filtration.
+        """
+        ifile = open(betti_filename)
+        betti = [list(map(int, x.split())) for x in ifile.readlines() if
+                 x.split()]
+        ifile.close()
+        betti = [x for x in betti if int(x[0]) <= step]
+        betti = pd.DataFrame(betti, columns=["birth_time",
+                                             "0th_dim(connected_components)",
+                                             "1th_dim(tunnels)",
+                                             "2th_dim(cavities)",
+                                             "3th_dim"])
+        return betti

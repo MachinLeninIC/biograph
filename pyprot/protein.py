@@ -3,10 +3,11 @@ from Bio import pairwise2
 import operator
 from pyprot.structure import StructureModel
 import Bio
+import pandas as pd
 
 
 class Protein:
-    def __init__(self, pdb):
+    def __init__(self, pdb, generate_dataframe=True):
         self.pdb = pdb
         self.aminoacids = {'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E',
                            'PHE': 'F', 'GLY': 'G', 'HIS': 'H', 'ILE': 'I',
@@ -15,6 +16,10 @@ class Protein:
                            'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'}
         #self.atoms = self._get_atoms()
         self.structure = None
+        if generate_dataframe:
+            self.df = self.generate_dataframe()
+        else:
+            self.df = None
 
     @property
     def pdb(self):
@@ -133,3 +138,28 @@ class Protein:
         v1 = np.repeat(atoms1.reshape(1,-1,3), atoms2.shape[0], axis=0)
         v2 = np.repeat(atoms2, atoms1.shape[0], axis=0).reshape(atoms2.shape[0],-1,3)
         return np.min(np.sum((v1 - v2)**2, axis=-1))
+
+    def head(self, n=10):
+        if self.df is not None:
+            return self.df.head(n)
+        else:
+            self.df = self.generate_dataframe()
+            return self.df.head(n)
+
+    def generate_dataframe(self, columns=["bfactor", "chain", "coord",
+                                          "disordered_flag", "element",
+                                          "full_id", "mass", "resname",
+                                          "occupancy"]):
+        # TODO: terminar
+        full_atom = []
+        for model in self.pdb:
+            for chain in model:
+                for residue in chain:
+                    for atom in residue:
+                        atom_i = atom.__dict__
+                        atom_i["resname"] = residue.resname
+                        atom_i["chain"] = chain.id
+                        atom_i["model"] = str(model.id)
+                        full_atom.append(atom_i)
+                        del(atom_i)
+        return pd.DataFrame(full_atom).loc[:, columns]

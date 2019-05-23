@@ -187,7 +187,7 @@ class StructureModel:
             length of edge
         """
         # TODO : check return DocBlock
-        return np.linalg.norm(self.delaunay.points[e[0]]-self.delaunay.points[e[1]])
+        return np.linalg.norm(self.delaunay.points[e[0]] - self.delaunay.points[e[1]])
 
     def _get_min_steps(self, order):
         """Method used to get minimum number of steps so as simplices cover all
@@ -210,46 +210,6 @@ class StructureModel:
                 min_n_steps = step
                 break
         return min_n_steps
-
-    def export_graph(self, as_networkx=True, as_adjancency=True,
-                     surface_graph=True, step="default"):
-        # TODO: comentar y mover a GraphModel
-        """
-        :param as_networkx:
-        :param as_adjancency:
-        :param surface_graph:
-        :param step:
-        :return: dict
-        """
-        results = {}
-        if step == "default":
-            step = self.persistent_hom_params["fat_step"]
-        else:
-            assert type(step) is int, "step must be 'default' or int"
-
-        core_edges = set()
-        for t in self._get_core(step):
-            for e in combinations(t, 2):
-                core_edges.add(e)
-        in_surf = {e: False for e in core_edges}
-        for t in self.get_simplices_by_step(step):
-            for e in combinations(t, 2):
-                in_surf[e] = True
-        G = nx.Graph()
-        G.add_edges_from([(e[0], e[1], {'weight': self.get_edge_length(e), 'in_surf':in_surf[e]}) for e in core_edges])
-
-        if as_networkx:
-            results["full_networkx_graph"] = G
-            if as_adjancency:
-                results["full_adjacency"] = [i for i in G.adjacency()]
-
-        if surface_graph:
-            G_surf = nx.Graph([e for e in G.edges(data=True) if e[-1]['in_surf']])
-            results["surface_networkx_graph"] = G_surf
-            if as_adjancency:
-                results["surface_adjacency"] = [i for i in G_surf.adjacency()]
-
-        return results
 
     def calculate_depth(self, surface_graph):
         """Calculates depth on the graph surface.
@@ -407,6 +367,10 @@ class Perseus:
         ----------
         topology : tuple or list
             topology is used to define different steps of interest.
+            son los betti numbers
+            No para antes que haya una componente conexa
+            Luego seguis agregando
+
         output_dir : str
             directory where output will be written
         output_filename : str

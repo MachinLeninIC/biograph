@@ -39,9 +39,39 @@ class Protein:
 
     def get_atoms(self, atom_as_dict=True, filter_atoms=lambda x: True,
                   filter_attr=lambda x: x):
-        """
-        Get atoms from PDB
-        :return: list of atoms
+        """Get atoms data from PDB.
+        This method uses Bio.PDB.Structure.Structure.get_atoms() method to
+        iterate through atoms. Atom can be represented both as a
+        Bio.PDB.Atom.Atom object or as a dict. In addition, filters can be
+        applied to choose what atoms and what atom's attributes retrieve.
+
+        Parameters
+        ----------
+        atom_as_dict : bool
+            Whether to represent an atom as a dict or as a Bio.PDB.Atom.Atom
+            Default True
+        filter_atoms : function
+            Function applied to each atom, used to filter attributes.
+        filter_attr : function
+            Function applied to each atom, it must return True or False.
+            If True the atom is returned, if False, the atom is filtered.
+
+        Returns
+        -------
+        numpy.Array
+            Array of atoms.
+
+        Examples
+        -------
+        # Get CA atoms using dict representation
+        ca_atoms = prot.get_atoms(filter_atoms=lambda x: x["name"] == "CA")
+
+        # Get CA atoms using Bio representation
+        ca_atoms = prot.get_atoms(
+            filter_atoms=lambda x: x.name == "CA", atom_as_dict)
+
+        # Just retreieve coordinates
+        ca_atoms = prot.get_atoms(filter_attr=lambda x: x["coord"])
         """
         if atom_as_dict:
             atoms = [filter_attr(atom.__dict__) for atom in
@@ -53,9 +83,49 @@ class Protein:
 
     def get_residues(self, res_as_dict=True, filter_res=lambda x: True,
                      filter_attr=lambda x: x):
-        """
-        Get atoms from PDB
-        :return: list of atoms
+        """Get residues data from PDB.
+        This method uses Bio.PDB.Structure.Structure.get_residues() method to
+        iterate through residues. Residue can be represented both as a
+        Bio.PDB.Residue.Residue object or as a dict. In addition, filters can
+        be applied to choose what residue and what residue's attributes
+        retrieve.
+
+        ----------
+        Parameters
+        res_as_dict : bool
+            Whether to represent a residue as a dict or as a
+            Bio.PDB.Residue.Residue
+            Default True
+        filter_res : function
+            Function applied to each residue, used to filter attributes.
+        filter_attr : function
+            Function applied to each residue, it must return True or False.
+            If True the residue is returned, if False, the residue is filtered.
+
+        Returns
+        -------
+        numpy.Array
+            Array of residues.
+
+        Examples
+        -------
+        # Get HOH using dict representation
+        hoh = prot.get_residues(filter_res=lambda x: x["resname"] == "HOH")
+        hoh[0]
+
+        {'_id': ('W', 201, ' '),
+         'child_dict': {'O': <Atom O>},
+         'child_list': [<Atom O>],
+         'disordered': 0,
+         'full_id': ('1a3z', 0, 'A', ('W', 201, ' ')),
+         'level': 'R',
+         'parent': <Chain id=A>,
+         'resname': 'HOH',
+         'segid': '    ',
+         'xtra': {}}
+
+        # Get residues names
+        resnames = prot.get_residues(filter_attr=lambda x: x["resname"])
         """
         if res_as_dict:
             atoms = [filter_attr(res.__dict__) for res in
@@ -140,6 +210,21 @@ class Protein:
         return np.min(np.sum((v1 - v2)**2, axis=-1))
 
     def head(self, n=10):
+        """  Return the first `n` rows (atoms) of pandas.DataFrame representation
+        of PDB.
+
+
+        Parameters
+        ----------
+        n : int
+            Number of rows (atoms) to select.
+
+        Returns
+        -------
+        pandas.Dataframe
+            n first rows of pandas.DataFrame representation of PDB
+
+        """
         if self.df is not None:
             return self.df.head(n)
         else:
@@ -150,7 +235,17 @@ class Protein:
                                           "disordered_flag", "element",
                                           "full_id", "mass", "resname",
                                           "occupancy"]):
-        # TODO: terminar
+        """ Generate a Pandas DataFrame from the PDB
+        Parameters
+        ----------
+        columns : list
+            list of column names to subset DataFrame
+
+        Returns
+        -------
+        Pandas.DataFrame
+            DataFrame which has an atom per row
+        """
         full_atom = []
         for model in self.pdb:
             for chain in model:

@@ -339,7 +339,7 @@ class StructureModel:
         triangles = self.get_simplices_by_step(step)
         ax = plt.axes(projection='3d')
         ax.view_init(view_init_elev, view_init_azim)
-        ax.plot_trisurf(self.points[:, 0] , self.points[:, 1],
+        ax.plot_trisurf(self.points[:, 0], self.points[:, 1],
                         self.points[:, 2], triangles=triangles, cmap=cmap)
 
 
@@ -348,8 +348,8 @@ class Perseus:
     Perseus a persistent homology-based approach is used to model the surface
     and core of proteins. In addition, this can be used to model de depth of
     a given residue in the protein.
-
     """
+
     def __init__(self):
         MODULEDIR = os.path.dirname(os.path.abspath(__file__))
         self.__perseuspath = os.path.join(MODULEDIR, "perseus", "perseus")
@@ -367,9 +367,16 @@ class Perseus:
         ----------
         topology : tuple or list
             topology is used to define different steps of interest.
-            son los betti numbers
-            No para antes que haya una componente conexa
-            Luego seguis agregando
+            First element, is the first betti number (b0), is the number of
+            connected components.
+            Second element, is the second betti number (b1), is the number of
+            holes.
+            Third element, is the third betti number (b2), is the number of
+            cavities.
+            At each step of the simplicial tessellation bettin numbers are
+            computed, using Perseus. This parameter regulates when to save
+            steps of interest.
+            For example, if b0 is 1, then when there is a connected component
 
         output_dir : str
             directory where output will be written
@@ -380,7 +387,23 @@ class Perseus:
         -------
         StructureModel
             StructureModel with persistent_hom_params computed
-        """
+            StructureModel.persistent_hom_params is a dict with the following
+            steps computed:
+            b0_step: step at which all points in the structure are covered by
+            the simplices.
+            b1_step: when all points in the structure are covered by the
+            simplices and topology[0] condition is met.
+            Typically, it might be of interest the step at which there is only
+            one connected component.
+            b2_step: when all points in the structure are covered by the
+            simplices and topology[0] and topology[1] conditions are met.
+            For example, you might be interested in knowing when there is only
+            one connected component and no holes.
+            b3_step: when all points in the structure are covered by the
+            simplices and topology[0] and topology[1] and topology[2] conditions
+            are met.
+            It may be the case that you are interested in knowing when there
+            is only one connected component, no holes and no cavities."""
         # TODO: ver con Lean
         structure_ = structure
         if isinstance(structure_, pyprot.protein.Protein):
@@ -401,7 +424,7 @@ class Perseus:
                 np.arange(1, 1 + structure.delaunay.nsimplex).reshape(-1, 1),
                 axis=1)
             np.savetxt(ofile, input, delimiter=' ', newline='\n', fmt='%i')
-        min_step = structure._get_min_steps(order=structure.simplices_order)
+        b0_step = structure._get_min_steps(order=structure.simplices_order)
         to_run = (self.__perseuspath, 'simtop',
                   os.path.join(dir_path, perseus_input_filename),
                   os.path.join(dir_path, "perseus_output"))
@@ -409,42 +432,43 @@ class Perseus:
         popen.wait()
         with open(os.path.join(output_dir, output_filename,
                                'perseus_output_betti.txt'), 'r') as ifile:
-            small_step = min_step
-            fat_step = min_step  # -1
-            big_step = min_step  # -1
+            b1_step = b0_step
+            b2_step = b0_step
+            b3_step = b0_step
             for line in ifile.readlines()[1:]:
                 # first line is blank
                 i, h0, h1, h2, _ = [int(x) for x in line.split()]
-                if i >= min_step and h0 == topology[0]:
+                if i >= b0_step and h0 == topology[0]:
 
-                    # only modifies the fat_step once
-                    if small_step == min_step:
-                        small_step = i
+                    # only modifies b0_step once
+                    if b1_step == b0_step:
+                        b1_step = i
 
-                    # only modifies the fat_step once
-                    if fat_step == min_step and h1 == topology[1]:
-                        fat_step = i
+                    # only modifies the b2_step online once
+                    if b2_step == b1_step and h1 == topology[1]:
+                        b2_step = i
+                    # save b3_step and break
                     if h1 == topology[1] and h2 == topology[2]:
-                        big_step = i
+                        b3_step = i
                         break
-                # TODO: check why is this assignment here
-                lh0 = h0
 
         if isinstance(structure_, pyprot.protein.Protein):
-            structure_.structure.persistent_hom_params["min_step"] = min_step
-            structure_.structure.persistent_hom_params["small_step"] = small_step
-            structure_.structure.persistent_hom_params["fat_step"] = fat_step
-            structure_.structure.persistent_hom_params["big_step"] = big_step
+            structure_.structure.persistent_hom_params["b0_step"] = b0_step
+            structure_.structure.persistent_hom_params["b1_step"] = b1_step
+            structure_.structure.persistent_hom_params["b2_step"] = b2_step
+            structure_.structure.persistent_hom_params["b3_step"] = b3_step
         else:
-            structure_.persistent_hom_params["min_step"] = min_step
-            structure_.persistent_hom_params["small_step"] = small_step
-            structure_.persistent_hom_params["fat_step"] = fat_step
-            structure_.persistent_hom_params["big_step"] = big_step
+            structure_.persistent_hom_params["b0_step"] = b0_step
+            structure_.persistent_hom_params["b1_step"] = b1_step
+            structure_.persistent_hom_params["b2_step"] = b2_step
+            structure_.persistent_hom_params["b3_step"] = b3_step
         return structure_
 
     @staticmethod
     def read_betti(betti_filename, step):
-        """Short summary.
+        """Read a betti file, the output of Perseus. If you had run Perseus
+        before you can just read that result, instead of running the process
+        again.
 
         Parameters
         ----------

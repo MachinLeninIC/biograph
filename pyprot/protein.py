@@ -4,6 +4,7 @@ import operator
 from pyprot.structure import StructureModel
 import Bio
 import pandas as pd
+from Bio.PDB import PDBParser
 
 
 class Protein:
@@ -27,8 +28,15 @@ class Protein:
 
     @pdb.setter
     def pdb(self, pdb):
-        assert isinstance(pdb, Bio.PDB.Structure.Structure), """A Bio.PDB.Structure.Structure must be used"""
-        self.__pdb = pdb
+        if isinstance(pdb, Bio.PDB.Structure.Structure):
+            self.__pdb = pdb
+        elif isinstance(pdb, str):
+            parser = PDBParser()
+            pdb = parser.get_structure("pdb_id", pdb)
+            self.__pdb = pdb
+        else:
+            raise Exception("""A Bio.PDB.Structure.Structure or a
+                            valid path must be used""")
 
     @pdb.deleter
     def pdb(self):
@@ -231,15 +239,22 @@ class Protein:
             self.df = self.generate_dataframe()
             return self.df.head(n)
 
-    def generate_dataframe(self, columns=["bfactor", "chain", "coord",
-                                          "disordered_flag", "element",
-                                          "full_id", "mass", "resname",
-                                          "occupancy"]):
+    @staticmethod
+    def __get_coordinates(coord):
+        return coord[0], coord[1], coord[2]
+
+    def generate_dataframe(self,
+                           columns=["bfactor", "chain", "coord",
+                                    "disordered_flag", "element", "full_id",
+                                    "mass", "resname", "occupancy"],
+                           split_coordinates=True):
         """ Generate a Pandas DataFrame from the PDB
         Parameters
         ----------
         columns : list
             list of column names to subset DataFrame
+        split_coordinates: bool
+            whether to return three extra columns x, y, z for coordinates or not
 
         Returns
         -------
@@ -257,4 +272,7 @@ class Protein:
                         atom_i["model"] = str(model.id)
                         full_atom.append(atom_i)
                         del(atom_i)
-        return pd.DataFrame(full_atom).loc[:, columns]
+        df = pd.DataFrame(full_atom).loc[:, columns]
+        if split_coordinates:
+            df["x"], df["y"], df["z"] = zip(*df.coord.apply(self.__get_coordinates))
+        return df

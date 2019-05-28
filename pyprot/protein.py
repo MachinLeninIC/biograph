@@ -18,7 +18,7 @@ class Protein:
         #self.atoms = self._get_atoms()
         self.structure = None
         if generate_dataframe:
-            self.df = self.generate_dataframe()
+            self.generate_dataframe()
         else:
             self.df = None
 
@@ -240,14 +240,22 @@ class Protein:
             return self.df.head(n)
 
     @staticmethod
-    def __get_coordinates(coord):
-        return coord[0], coord[1], coord[2]
+    def __get_coordinates(coord, raise_error=True):
+        if hasattr(coord, "__getitem__"):
+            return coord[0], coord[1], coord[2]
+        else:
+            if raise_error:
+                raise TypeError("""Non-suscriptable type when parsing file.
+                                Please, check if there are null values in PDB
+                                or use raise_error=False""")
+            else:
+                return None, None, None
 
     def generate_dataframe(self,
                            columns=["bfactor", "chain", "coord",
                                     "disordered_flag", "element", "full_id",
                                     "mass", "resname", "occupancy"],
-                           split_coordinates=True):
+                           split_coordinates=True, raise_error=False):
         """ Generate a Pandas DataFrame from the PDB
         Parameters
         ----------
@@ -255,6 +263,9 @@ class Protein:
             list of column names to subset DataFrame
         split_coordinates: bool
             whether to return three extra columns x, y, z for coordinates or not
+        raise_error: bool
+            when trying to split coordinates you can choose to raise error or
+            to generate null values. Default is False.
 
         Returns
         -------
@@ -274,5 +285,6 @@ class Protein:
                         del(atom_i)
         df = pd.DataFrame(full_atom).loc[:, columns]
         if split_coordinates:
-            df["x"], df["y"], df["z"] = zip(*df.coord.apply(self.__get_coordinates))
-        return df
+            df["x"], df["y"], df["z"] = zip(*df.coord.apply(
+                lambda x: self.__get_coordinates(x, raise_error)))
+        self.df = df

@@ -43,7 +43,11 @@ class Protein:
         del self.__pdb
 
     def generate_structure(self, points):
+        # TODO: maybe we could refactor to inject different struc models
         self.structure = StructureModel(points)
+
+    def generate_graph(self, model, model_params):
+        self.graph = model.generate_graph(model_params)
 
     def get_atoms(self, atom_as_dict=True, filter_atoms=lambda x: True,
                   filter_attr=lambda x: x):
@@ -164,7 +168,9 @@ class Protein:
         return bfactor
 
     def get_points_(self, dtype=np.float32):
+        # TODO: sacar
         """
+        DEPRECATED, reemplazado por get_atoms
         Get coordinates of nodes (atoms)
         :param dtype: dtype of array to be returned, default is dtype32
         :return: np.array with coordinates of atoms
@@ -172,6 +178,7 @@ class Protein:
         return np.array([atom.coord for atom in self.pdb.get_atoms() if atom["atom_full_id"][4][0] == "CA"], dtype=dtype)
 
     def read_conservation(self, path, chain_list):
+        # TODO: mover a un modulo externals o algo asi
         with open(path, 'r') as ifile:
             thelines = [x.rstrip('\n') for x in ifile.readlines()]
             thelines = [x.split('\t') for x in thelines]

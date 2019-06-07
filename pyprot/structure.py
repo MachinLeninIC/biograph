@@ -2,7 +2,6 @@ import numpy as np
 from scipy.spatial import Delaunay
 from itertools import combinations, chain
 import os
-from pyprot.constants import PERSEUSPATH
 import subprocess
 import networkx as nx
 from pyprot.io import Writer
@@ -404,13 +403,12 @@ class Perseus:
             are met.
             It may be the case that you are interested in knowing when there
             is only one connected component, no holes and no cavities."""
-        # TODO: ver con Lean
         structure_ = structure
         if isinstance(structure_, pyprot.protein.Protein):
             structure = structure.structure
 
         # TODO: validar que structure tenga datos
-        # TODO: validar que sea Protein o StructeModel
+        # TODO: validar que sea Protein
 
         dir_path = os.path.join(output_dir, output_filename)
         Writer(dir_path).create_directory()

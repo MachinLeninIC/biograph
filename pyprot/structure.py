@@ -353,11 +353,11 @@ class Perseus:
         MODULEDIR = os.path.dirname(os.path.abspath(__file__))
         self.__perseuspath = os.path.join(MODULEDIR, "perseus", "perseus")
 
-    def calculate_fatcore(self, structure, topology=(1, 0, 0),
-                          perseus_input_filename="ordered_simplices.pers",
-                          output_dir="perseus", output_filename="pdb"):
+    def execute_persistent_hom(self, structure, topology=(1, 0, 0),
+                               perseus_input_filename="ordered_simplices.pers",
+                               output_dir="perseus", output_filename="pdb"):
         """
-        Function used to calculate fatcore. This function uses Perseus's
+        Function used to execute persistent homology. This function uses Perseus's
         simtop method.
         Perseus's documentation can be found in:
         http://people.maths.ox.ac.uk/nanda/perseus/index.html

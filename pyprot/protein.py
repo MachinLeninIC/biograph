@@ -10,12 +10,12 @@ from Bio.PDB import PDBParser
 class Protein:
     def __init__(self, pdb, generate_dataframe=True):
         self.pdb = pdb
+        # TODO: move self.aminoacids to constants
         self.aminoacids = {'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E',
                            'PHE': 'F', 'GLY': 'G', 'HIS': 'H', 'ILE': 'I',
                            'LYS': 'K', 'LEU': 'L', 'MET': 'M', 'ASN': 'N',
                            'PRO': 'P', 'GLN': 'Q', 'ARG': 'R', 'SER': 'S',
                            'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'}
-        #self.atoms = self._get_atoms()
         self.structure = None
         if generate_dataframe:
             self.generate_dataframe()
@@ -47,7 +47,7 @@ class Protein:
         self.structure = StructureModel(points)
 
     def generate_graph(self, model, model_params):
-        self.graph = model.generate_graph(model_params)
+        self.graph = model.generate_graph(self, model_params)
 
     def get_atoms(self, atom_as_dict=True, filter_atoms=lambda x: True,
                   filter_attr=lambda x: x):

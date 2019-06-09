@@ -8,6 +8,7 @@ from pyprot.io import Writer
 import pyprot
 import matplotlib.pyplot as plt
 import pandas as pd
+from mpl_toolkits import mplot3d
 
 
 class StructureModel:
@@ -45,6 +46,8 @@ class StructureModel:
 
     @points.setter
     def points(self, points):
+        # TODO: check if its working properly
+        # TODO: must admit list and series too
         assert isinstance(points, np.ndarray), """A Numpy array matrix must be
                                                         used for points"""
         self.__points = points
@@ -443,7 +446,7 @@ class Perseus:
                         b1_step = i
 
                     # only modifies the b2_step online once
-                    if b2_step == b1_step and h1 == topology[1]:
+                    if b2_step == b0_step and h1 == topology[1]:
                         b2_step = i
                     # save b3_step and break
                     if h1 == topology[1] and h2 == topology[2]:

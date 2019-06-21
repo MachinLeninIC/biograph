@@ -26,13 +26,13 @@ def start_job(pdb_id,chain, results):
     driver.close()
     return results
 
-for i in codes:
-    results = []
-    pdb_id = codes[0]
-    chain = codes[1]
-    results = start_job(pdb_id,chain,results)
-    df = pd.DataFrame(results)
-    df.to_csv(path, index=False)
+#for i in codes:
+#    results = []
+#    pdb_id = codes[0]
+#    chain = codes[1]
+#    results = start_job(pdb_id,chain,results)
+#    df = pd.DataFrame(results)
+#    df.to_csv(path, index=False)
 
 
 # response = requests.get("http://consurf.tau.ac.il/results/job_id/output.php".replace("job_id", job_id))

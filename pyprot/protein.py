@@ -5,22 +5,20 @@ from pyprot.structure import StructureModel
 import Bio
 import pandas as pd
 from Bio.PDB import PDBParser
+from pyprot.constants import amino_1code, valid_amino_3, valid_amino_1
 
 
 class Protein:
-    def __init__(self, pdb, generate_dataframe=True):
+    def __init__(self, pdb):
         self.pdb = pdb
-        # TODO: move self.aminoacids to constants
-        self.aminoacids = {'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E',
-                           'PHE': 'F', 'GLY': 'G', 'HIS': 'H', 'ILE': 'I',
-                           'LYS': 'K', 'LEU': 'L', 'MET': 'M', 'ASN': 'N',
-                           'PRO': 'P', 'GLN': 'Q', 'ARG': 'R', 'SER': 'S',
-                           'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'}
         self.structure = None
-        if generate_dataframe:
+        self._df = None
+
+    @property
+    def df(self):
+        if self._df is None:
             self.generate_dataframe()
-        else:
-            self.df = None
+        return self._df
 
     @property
     def pdb(self):
@@ -32,7 +30,9 @@ class Protein:
             self.__pdb = pdb
         elif isinstance(pdb, str):
             parser = PDBParser()
-            pdb = parser.get_structure("pdb_id", pdb)
+            # Infer pdb_id from filename
+            pdb_id = pdb.split("/")[-1][:-4]
+            pdb = parser.get_structure(pdb_id, pdb)
             self.__pdb = pdb
         else:
             raise Exception("""A Bio.PDB.Structure.Structure or a
@@ -93,21 +93,15 @@ class Protein:
                      self.pdb.get_atoms() if filter_atoms(atom)]
         return np.array(atoms)
 
-    def get_residues(self, res_as_dict=True, filter_res=lambda x: True,
+    def get_residues_dict(self, filter_res=lambda x: True,
                      filter_attr=lambda x: x):
-        """Get residues data from PDB.
+        """Get residues data from PDB as an array of dictionaries.
         This method uses Bio.PDB.Structure.Structure.get_residues() method to
-        iterate through residues. Residue can be represented both as a
-        Bio.PDB.Residue.Residue object or as a dict. In addition, filters can
-        be applied to choose what residue and what residue's attributes
-        retrieve.
+        iterate through residues. In addition, filters can
+        be applied to choose which residues and which attributes to retrieve.
 
         ----------
         Parameters
-        res_as_dict : bool
-            Whether to represent a residue as a dict or as a
-            Bio.PDB.Residue.Residue
-            Default True
         filter_res : function
             Function applied to each residue, used to filter attributes.
         filter_attr : function
@@ -117,7 +111,7 @@ class Protein:
         Returns
         -------
         numpy.Array
-            Array of residues.
+            Array of residue dicts.
 
         Examples
         -------
@@ -139,12 +133,52 @@ class Protein:
         # Get residues names
         resnames = prot.get_residues(filter_attr=lambda x: x["resname"])
         """
-        if res_as_dict:
-            atoms = [filter_attr(res.__dict__) for res in
-                     self.pdb.get_residues() if filter_res(res.__dict__)]
-        else:
-            atoms = [filter_attr(res) for res in
-                     self.pdb.get_residues() if filter_res(res)]
+        atoms = [filter_attr(res.__dict__) for res in
+                 self.pdb.get_residues() if filter_res(res.__dict__)]
+        return atoms
+
+    def get_residues(self, filter_res=lambda x: True,
+                     filter_attr=lambda x: x):
+        """Get residues data from PDB as an array of Bio.PDB.Residue.Residue.
+        This method uses Bio.PDB.Structure.Structure.get_residues() method to
+        iterate through residues.  In addition, filters can
+        be applied to choose which residues and which attributes to retrieve.
+
+        ----------
+        Parameters
+        filter_res : function
+            Function applied to each residue, used to filter attributes.
+        filter_attr : function
+            Function applied to each residue, it must return True or False.
+            If True the residue is returned, if False, the residue is filtered.
+
+        Returns
+        -------
+        numpy.Array
+            Array of residues.
+
+        Examples
+        -------
+        # Get HOH using dict representation
+        hoh = prot.get_residues(filter_res=lambda x: x.resname == "HOH")
+        hoh[0].__dict__
+
+        {'_id': ('W', 201, ' '),
+         'child_dict': {'O': <Atom O>},
+         'child_list': [<Atom O>],
+         'disordered': 0,
+         'full_id': ('1a3z', 0, 'A', ('W', 201, ' ')),
+         'level': 'R',
+         'parent': <Chain id=A>,
+         'resname': 'HOH',
+         'segid': '    ',
+         'xtra': {}}
+
+        # Get residues names
+        resnames = prot.get_residues(filter_attr=lambda x: x.resname)
+        """
+        atoms = [filter_attr(res) for res in
+                 self.pdb.get_residues() if filter_res(res)]
         return atoms
 
     def _get_bfactor_by_atom(self):
@@ -167,35 +201,27 @@ class Protein:
                    self.pdb.get_residues()]
         return bfactor
 
-    def get_points_(self, dtype=np.float32):
-        # TODO: sacar
-        """
-        DEPRECATED, reemplazado por get_atoms
-        Get coordinates of nodes (atoms)
-        :param dtype: dtype of array to be returned, default is dtype32
-        :return: np.array with coordinates of atoms
-        """
-        return np.array([atom.coord for atom in self.pdb.get_atoms() if atom["atom_full_id"][4][0] == "CA"], dtype=dtype)
-
     def read_conservation(self, path, chain_list):
         # TODO: mover a un modulo externals o algo asi
+        ##Alineación
         with open(path, 'r') as ifile:
             thelines = [x.rstrip('\n') for x in ifile.readlines()]
             thelines = [x.split('\t') for x in thelines]
             thelines = [x for x in thelines if len(x) == 14]
         if not thelines:
             return None
-        seqSelf = ''.join([self.aminoacids[r.resname] for r in self._get_residues() if r.resname in
-                           self.aminoacids.keys() and r.parent.id in chain_list])
+        seqSelf = ''.join([amino_1code(r.resname) for r in self.get_residues() 
+                        if valid_amino_3(r.resname) and r.parent.id in chain_list])
         seqCS = ''.join([y[1].lstrip() for y in thelines])
         alignment = max(pairwise2.align.globalxx(seqSelf, seqCS), key=operator.itemgetter(1))
         seqSelf, seqCS, _, _, _ = alignment
-        enumres = enumerate([r for r in self._get_residues() if r.resname in
-                             self.aminoacids.keys() and r.parent.id in chain_list])
+        enumres = enumerate([r for r in self.get_residues()
+                             if valid_amino_3(r.resname) and r.parent.id in chain_list])
         thelines.reverse() # to pop() first element first
         prot_conservation = []
         count_good = 0
         count_bad = 0
+        #Join de cosas.
         for x,y in zip(seqSelf, seqCS):
             res_conservation = {}
             i, res = next(enumres) if x != '-' else (-1, None)
@@ -209,10 +235,11 @@ class Protein:
                 res_conservation["residue_variety"] = line[-1]
                 count_good += 1
                 prot_conservation.append(res_conservation)
-                if res.resname in self.aminoacids.values():
-                    if self.aminoacids[res.resname] != x or x != y or y != line[1].lstrip():
-                        print((x, y, i, res.resname, line[:3]))  # should never happen
-                        count_bad += 1
+                if valid_amino_1(res.resname) and (
+                    amino_1code(res.resname) != x or x != y or y != line[1].lstrip()):
+                    # No se alineó realmente
+                    print((x, y, i, res.resname, line[:3]))  # should never happen
+                    count_bad += 1
 
         return prot_conservation, seqSelf, seqCS
 
@@ -240,11 +267,7 @@ class Protein:
             n first rows of pandas.DataFrame representation of PDB
 
         """
-        if self.df is not None:
-            return self.df.head(n)
-        else:
-            self.df = self.generate_dataframe()
-            return self.df.head(n)
+        return self.df.head(n)
 
     @staticmethod
     def __get_coordinates(coord, raise_error=True):
@@ -294,4 +317,4 @@ class Protein:
         if split_coordinates:
             df["x"], df["y"], df["z"] = zip(*df.coord.apply(
                 lambda x: self.__get_coordinates(x, raise_error)))
-        self.df = df
+        self._df = df

@@ -4,6 +4,7 @@ from getcontacts.contact_calc.compute_contacts import compute_contacts
 from getcontacts.contact_calc import transformations
 from getcontacts.Applications.contact_network_analysis import create_graph
 import tempfile
+import sys
 
 class StructureGraphGenerator:
     def __init__(self):
@@ -42,27 +43,65 @@ class StructureGraphGenerator:
             if as_adjancency:
                 results["surface_adjacency"] = [i for i in G_surf.adjacency()]'''
 
-class StaticConctactGraphGenerator:
+class StaticContactGraphGenerator:
     def __init__(self):
         self.G = nx.Graph()
+    def _parse_geometric_criteria(self, geom):
+        """
+        Set sensible defaults for the geometric parameters of the model.
+        Values are taken from the argparsers in the getcontacts library.
+        """
+        # Distances are in angstroms, angles are in degrees.
+        geom.setdefault("SALT_BRIDGE_CUTOFF_DISTANCE", 4.0)
+        geom.setdefault("PI_CATION_CUTOFF_DISTANCE", 6.0)
+        geom.setdefault("PI_CATION_CUTOFF_ANGLE", 60)
+        geom.setdefault("PI_STACK_CUTOFF_DISTANCE", 7.0)
+        geom.setdefault("PI_STACK_CUTOFF_ANGLE", 30)
+        geom.setdefault("PI_STACK_PSI_ANGLE", 45)
+        geom.setdefault("T_STACK_CUTOFF_DISTANCE", 5.0)
+        geom.setdefault("T_STACK_CUTOFF_ANGLE", 30)
+        geom.setdefault("T_STACK_PSI_ANGLE", 45)
+        geom.setdefault("HBOND_CUTOFF_DISTANCE", 3.5)
+        geom.setdefault("HBOND_CUTOFF_ANGLE", 180)
+        geom.setdefault("HBOND_RES_DIFF", 1)
+        geom.setdefault("VDW_EPSILON", 0.5)
+        geom.setdefault("VDW_RES_DIFF", 2)
+        return geom
 
     def _parse_params(self, params):
-        params.setdefault("itypes", None)
-        params.setdefault("geom_criteria", )
-        params.setdefault("cores", 2)
-        params.setdefault("beg", )
-        params.setdefault("end", )
-        params.setdefault("stride", )
-        params.setdefault("distout", )
-        params.setdefault("ligand", )
-        params.setdefault("solv", )
-        params.setdefault("lipid", )
-        params.setdefault("sele1", )
-        params.setdefault("sele2",  )
+        """
+        Set sensible defaults for the parameters of the model. Values are taken
+        from the get static contacts scripts in the getcontacts library.
+        """
+        params.setdefault("itypes", "all") # it is not actually optional
+        params.setdefault("geom_criteria", dict())
+        params["geom_criteria"] = self._parse_geometric_criteria(params["geom_criteria"])
+        params.setdefault("distout", False)
+        params.setdefault("ligand", "")
+        params.setdefault("solv", None)
+        params.setdefault("lipid", "")
+        params.setdefault("sele1", "protein")
+        params.setdefault("sele2", params["sele1"])
         params.setdefault("save_contact_filename", None)
         return params
 
     def generate_graph(self, protein, params):
+        """
+        Generate a contact static graph from the PDB file.
+        Parameters
+        ----------
+        protein: the Protein object. Either it was created with a file name as
+        argument or you prove a 'pdb_file' in params.
+        params: parameters for the model, including geometry criteria. It has
+        sensible defaults. You can view the full list of parameters in the
+        getcontact package.
+
+        Returns
+        -------
+        graph: a networkx.Graph instance containing the full static contact graph
+        for the given protein.
+        """
+        params = self._parse_params(params)
         pdb_file = protein.pdb_file
         pdb_file = pdb_file if "pdb_file" not in params else params["pdb_file"]
         if pdb_file is None:
@@ -77,15 +116,26 @@ class StaticConctactGraphGenerator:
             contacts_filename = "{}/{}_contacts.tsv".format(tempdir.name,
                 pdb_file.replace(".pdb", ""))
 
+        # The library also manipulates the stdout file descriptors, which
+        # triggers unsupported behavior in iPython-like environments (e.g.
+        # Jupyter). Therefore we need to mask it for a bit.
+        _stdout = sys.stdout
+        sys.stdout = tempfile.TemporaryFile()
         # If instead of the trajectory you pass it the topology again, then
         # it calculates static contacts.
+        # Since we are not using trajectories, cores is always 1, beg and end
+        # are 0, and stride is 1.
         compute_contacts(pdb_file, pdb_file, contacts_filename,
-            params["itypes"], params["geom_criteria"], params["cores"],
-            params["beg"], params["end"], params["stride"], params["distout"],
-            params["ligand"], params["solv"], params["lipid"], params["sele1"],
-            params["sele2"])
+            params["itypes"], params["geom_criteria"],
+            1, 0, 0, 1,
+            params["distout"], params["ligand"], params["solv"], params["lipid"],
+            params["sele1"], params["sele2"])
+
+        # Give back the stdout.
+        sys.stdout= _stdout
         with open(contacts_filename, "r") as handle:
-            atom_interactions = transformations.parse_contacts(handle, params["itypes"])
+            # We want all interaction types, so we pass None.
+            atom_interactions = transformations.parse_contacts(handle, None)
         residue_interactions = transformations.res_contacts(atom_interactions)
         interaction_counts = transformations.gen_counts(residue_interactions)
 

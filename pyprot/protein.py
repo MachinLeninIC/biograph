@@ -26,9 +26,11 @@ class Protein:
 
     @pdb.setter
     def pdb(self, pdb):
+        self.pdb_file = None
         if isinstance(pdb, Bio.PDB.Structure.Structure):
             self.__pdb = pdb
         elif isinstance(pdb, str):
+            self.pdb_file = pdb
             parser = PDBParser()
             # Infer pdb_id from filename
             pdb_id = pdb.split("/")[-1][:-4]

@@ -1,6 +1,9 @@
 import networkx as nx
 from itertools import combinations
-
+from getcontacts.contact_calc.compute_contacts import compute_contacts
+from getcontacts.contact_calc import transformations
+from getcontacts.Applications.contact_network_analysis import create_graph
+import tempfile
 
 class StructureGraphGenerator:
     def __init__(self):
@@ -38,3 +41,57 @@ class StructureGraphGenerator:
             results["surface_networkx_graph"] = G_surf
             if as_adjancency:
                 results["surface_adjacency"] = [i for i in G_surf.adjacency()]'''
+
+class StaticConctactGraphGenerator:
+    def __init__(self):
+        self.G = nx.Graph()
+
+    def _parse_params(self, params):
+        params.setdefault("itypes", None)
+        params.setdefault("geom_criteria", )
+        params.setdefault("cores", 2)
+        params.setdefault("beg", )
+        params.setdefault("end", )
+        params.setdefault("stride", )
+        params.setdefault("distout", )
+        params.setdefault("ligand", )
+        params.setdefault("solv", )
+        params.setdefault("lipid", )
+        params.setdefault("sele1", )
+        params.setdefault("sele2",  )
+        params.setdefault("save_contact_filename", None)
+        return params
+
+    def generate_graph(self, protein, params):
+        pdb_file = protein.pdb_file
+        pdb_file = pdb_file if "pdb_file" not in params else params["pdb_file"]
+        if pdb_file is None:
+            raise Exception("You need to provide a pdb_file as a parameter.")
+
+        # Unfortunately, the library requires a filename to operate.
+        # And it actually calls open().
+        if params["save_contact_filename"] is not None:
+            contacts_filename = params["save_contact_filename"]
+        else:
+            tempdir = tempfile.TemporaryDirectory()
+            contacts_filename = "{}/{}_contacts.tsv".format(tempdir.name,
+                pdb_file.replace(".pdb", ""))
+
+        # If instead of the trajectory you pass it the topology again, then
+        # it calculates static contacts.
+        compute_contacts(pdb_file, pdb_file, contacts_filename,
+            params["itypes"], params["geom_criteria"], params["cores"],
+            params["beg"], params["end"], params["stride"], params["distout"],
+            params["ligand"], params["solv"], params["lipid"], params["sele1"],
+            params["sele2"])
+        with open(contacts_filename, "r") as handle:
+            atom_interactions = transformations.parse_contacts(handle, params["itypes"])
+        residue_interactions = transformations.res_contacts(atom_interactions)
+        interaction_counts = transformations.gen_counts(residue_interactions)
+
+        for (res1, res2), num_interactions in interaction_counts.items():
+            self.G.add_node(res1)
+            self.G.add_node(res2)
+            self.G.add_edge(res1, res2, weight=num_interactions)
+
+        return self.G

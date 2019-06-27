@@ -50,6 +50,7 @@ class Protein:
 
     def generate_graph(self, model, model_params):
         self.graph = model.generate_graph(self, model_params)
+        return self.graph
 
     def get_atoms(self, atom_as_dict=True, filter_atoms=lambda x: True,
                   filter_attr=lambda x: x):

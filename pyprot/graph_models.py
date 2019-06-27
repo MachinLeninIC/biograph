@@ -73,7 +73,7 @@ class StaticContactGraphGenerator:
         Set sensible defaults for the parameters of the model. Values are taken
         from the get static contacts scripts in the getcontacts library.
         """
-        params.setdefault("itypes", "all") # it is not actually optional
+        params.setdefault("itypes", ["sb", "pc", "ps", "ts", "vdw", "hb", "hp"])
         params.setdefault("geom_criteria", dict())
         params["geom_criteria"] = self._parse_geometric_criteria(params["geom_criteria"])
         params.setdefault("distout", False)
@@ -120,7 +120,7 @@ class StaticContactGraphGenerator:
         # triggers unsupported behavior in iPython-like environments (e.g.
         # Jupyter). Therefore we need to mask it for a bit.
         _stdout = sys.stdout
-        sys.stdout = tempfile.TemporaryFile()
+        sys.stdout = tempfile.TemporaryFile(mode="w+")
         # If instead of the trajectory you pass it the topology again, then
         # it calculates static contacts.
         # Since we are not using trajectories, cores is always 1, beg and end
@@ -133,9 +133,14 @@ class StaticContactGraphGenerator:
 
         # Give back the stdout.
         sys.stdout= _stdout
+        lines = []
         with open(contacts_filename, "r") as handle:
-            # We want all interaction types, so we pass None.
-            atom_interactions = transformations.parse_contacts(handle, None)
+            line = handle.readline()
+            while line:
+                lines.append(line)
+                line = handle.readline()
+        # We want all interaction types, so we pass None.
+        atom_interactions, num_frames = transformations.parse_contacts(lines, None)
         residue_interactions = transformations.res_contacts(atom_interactions)
         interaction_counts = transformations.gen_counts(residue_interactions)
 

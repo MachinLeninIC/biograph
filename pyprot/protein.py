@@ -1,11 +1,12 @@
 import numpy as np
-from Bio import pairwise2
-import operator
-from pyprot.structure import StructureModel
-import Bio
 import pandas as pd
+import operator
+import Bio
+from Bio import pairwise2
 from Bio.PDB import PDBParser
+from pyprot.structure import StructureModel
 from pyprot.constants import amino_1code, valid_amino_3, valid_amino_1
+from pyprot import alignment
 
 
 class Protein:
@@ -202,46 +203,13 @@ class Protein:
         return bfactor
 
     def read_conservation(self, path, chain_list):
-        # TODO: mover a un modulo externals o algo asi
-        ##Alineación
-        with open(path, 'r') as ifile:
-            thelines = [x.rstrip('\n') for x in ifile.readlines()]
-            thelines = [x.split('\t') for x in thelines]
-            thelines = [x for x in thelines if len(x) == 14]
-        if not thelines:
-            return None
-        seqSelf = ''.join([amino_1code(r.resname) for r in self.get_residues() 
-                        if valid_amino_3(r.resname) and r.parent.id in chain_list])
-        seqCS = ''.join([y[1].lstrip() for y in thelines])
-        alignment = max(pairwise2.align.globalxx(seqSelf, seqCS), key=operator.itemgetter(1))
-        seqSelf, seqCS, _, _, _ = alignment
-        enumres = enumerate([r for r in self.get_residues()
-                             if valid_amino_3(r.resname) and r.parent.id in chain_list])
-        thelines.reverse() # to pop() first element first
-        prot_conservation = []
-        count_good = 0
-        count_bad = 0
-        #Join de cosas.
-        for x,y in zip(seqSelf, seqCS):
-            res_conservation = {}
-            i, res = next(enumres) if x != '-' else (-1, None)
-            line = thelines.pop() if y != '-' else None
-            if res and line:
-                res_conservation["res_full_id"] = res.full_id
-                res_conservation["score"] = float(line[3])
-                res_conservation["color"] = line[5]
-                res_conservation["score_confidence_interval"] = line[6]
-                res_conservation["color_confidence_interval"] = line[9]
-                res_conservation["residue_variety"] = line[-1]
-                count_good += 1
-                prot_conservation.append(res_conservation)
-                if valid_amino_1(res.resname) and (
-                    amino_1code(res.resname) != x or x != y or y != line[1].lstrip()):
-                    # No se alineó realmente
-                    print((x, y, i, res.resname, line[:3]))  # should never happen
-                    count_bad += 1
+        valid_residues = [r for r in self.get_residues()
+            if valid_amino_3(r.resname) and r.parent.id in chain_list]
+        self_sequence = ''.join([amino_1code(r.resname) for r in valid_residues)
+        features = {r.full_id:dict() for r in valid_residues}
 
-        return prot_conservation, seqSelf, seqCS
+        features = alignment.join_conservation_data(self_sequence, features, path)
+        return features
 
     @staticmethod
     def distance_bet_res(r1, r2):

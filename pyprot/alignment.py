@@ -19,10 +19,11 @@ def get_alignment(sequenceA, sequenceB, featuresA, featuresB):
     Returns
     -------
     featureA: element of featuresA aligned with element of featuresB
-    featureB: element of featuresB aligned with element of featuresA 
+    featureB: element of featuresB aligned with element of featuresA
     """
     alignment = max(pairwise2.align.globalxx(sequenceA, sequenceB), key=operator.itemgetter(1))
-    alignedA, alignedB, _, _, _ = alignment
+    alignedA, alignedB, _, __, ___ = alignment
+
 
     featuresA = iter(featuresA)
     featuresB = iter(featuresB)
@@ -65,7 +66,9 @@ def join_conservation_data(sequence, features_dict, conservation_file):
     for res_id, line in get_alignment(sequence, cons_sequence, features, lines):
         features_dict[res_id]["score"] = float(line[3])
         features_dict[res_id]["color"] = line[5]
-        features_dict[res_id]["score_confidence_interval"] = line[6]
-        features_dict[res_id]["color_confidence_interval"] = line[9]
-        features_dict[res_id]["residue_variety"] = line[-1]
+        features_dict[res_id]["score_confidence_interval_low"] = float(line[6].split(",")[0])
+        features_dict[res_id]["score_confidence_interval_high"] = float(line[6].split(",")[1])
+        features_dict[res_id]["color_confidence_interval_low"] = float(line[9].split(",")[0])
+        features_dict[res_id]["color_confidence_interval_high"] = float(line[9].split(",")[1])
+        features_dict[res_id]["residue_variety"] = line[-1].replace(",", " ")
     return features_dict

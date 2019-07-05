@@ -17,13 +17,19 @@ class StructureModel:
 
     Parameters
     ----------
-    points : list or list-like
+    point_ids : list or list-like
+        Identifier for each item in points. Useful for understanding the
+        results of the structure model.
+    points : list, np.ndarray or pd.Series
         List or list-like of lists in which each element has three coordinates.
+        In case of providing a pd.Series, the elements must be np.ndarrays.
 
     Attributes
     ----------
-    points : list or list-like
-        List or list-like of lists in which each element has three coordinates.
+    point_ids: list-like
+        A list-like structure for identifying each coordinate row (see `points`).
+    points : np.ndarray
+        Point coordinate matrix.
     simplices_order : np.ndarray
         Order of simplices as computed by Delaunay
     persistent_hom_params : dict

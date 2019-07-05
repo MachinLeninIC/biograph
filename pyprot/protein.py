@@ -47,9 +47,24 @@ class Protein:
     def pdb(self):
         del self.__pdb
 
-    def generate_structure(self, points):
-        # TODO: maybe we could refactor to inject different struc models
-        self.structure = StructureModel(points)
+    def generate_structure(self, filter_rows):
+        """
+        Generate a structure model from selected rows of the dataframe.
+
+        Parameters
+        ----------
+        filter_rows: function
+            A filter function that is applied to each row of the dataframe
+
+        Returns
+        -------
+        structure: StructureModel
+        """
+        # TODO: maybe we could refactor this to inject different structure models?
+        rows = self.df[self.df.apply(filter_rows), ["full_id", "coord"]]
+        ids, coords = rows["full_id"], rows["coord"]
+        self.structure = StructureModel(ids, points)
+        return self.structure
 
     def generate_graph(self, model, model_params):
         self.graph = model.generate_graph(self, model_params)

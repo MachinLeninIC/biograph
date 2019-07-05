@@ -6,6 +6,8 @@ from getcontacts.Applications.contact_network_analysis import create_graph
 import tempfile
 import sys
 
+from pyprot.constants import valid_amino_3
+
 class StructureGraphGenerator:
     def __init__(self):
         self.G = nx.Graph()
@@ -149,4 +151,52 @@ class StaticContactGraphGenerator:
             self.G.add_node(res2)
             self.G.add_edge(res1, res2, weight=num_interactions)
 
+        return self.G
+
+    def add_features(self, dataframe, columns = ["bfactor", "score", "color",
+            "color_confidence_interval_high", "color_confidence_interval_low",
+            "score_confidence_interval_high", "score_confidence_interval_low"]):
+        """
+        Add features to the static contact graph based on a dataframe.
+        Dataframe must have res_full_id with standard Bio.PDB format
+        and resname with three-letter aminoacid code.
+
+        Parameters
+        ----------
+        dataframe : pd.DataFrame
+            Dataframe to get features from.
+        columns : list
+            Columns to be included. Must be numeric. If many values
+            are repeated for the same residue (e.g. if the dataframe
+            is at the atom level), they are averaged.
+
+        Returns
+        -------
+        nx.Graph
+        """
+        features = dataframe.groupby(["res_full_id", "resname"]).mean().reset_index()
+        columns = [col for col in columns if col in features.columns]
+
+        count_missing = 0
+
+        for index, row in features.iterrows():
+            # Sometimes there are water molecules or things that are not aminoacids
+            # in the dataframe.
+            if not valid_amino_3(row["resname"]):
+                continue
+
+            #res_full_id has format (pdb_name, 0, chain, (atom, residue_inumber, t))
+            #residue identifier in get_contact is chain:amino_3code:residue_inumber
+            res_id = "{}:{}:{}".format(row["res_full_id"][2], row["resname"], row["res_full_id"][3][1])
+
+            if res_id not in self.G.nodes:
+                print("Missing node here: {} - {} aka {}".format(
+                    row["res_full_id"], row["resname"], res_id))
+                count_missing+=1
+                continue
+
+            for col in columns:
+                self.G.nodes[res_id][col] = row[col]
+
+        print("Missing nodes: {}".format(count_missing))
         return self.G

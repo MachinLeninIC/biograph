@@ -60,10 +60,11 @@ class Protein:
         -------
         structure: StructureModel
         """
-        # TODO: maybe we could refactor this to inject different structure models?
-        rows = self.df[self.df.apply(filter_rows), ["full_id", "coord"]]
+        rows = self.df.loc[
+            self.df.apply(filter_rows, axis=1),
+            ["full_id", "coord"]].reset_index(drop=True)
         ids, coords = rows["full_id"], rows["coord"]
-        self.structure = StructureModel(ids, points)
+        self.structure = StructureModel(ids, coords)
         return self.structure
 
     def generate_graph(self, model, model_params):

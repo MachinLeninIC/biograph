@@ -14,24 +14,64 @@ class StructureGraphGenerator:
 
     def generate_graph(self, obj, params):
         if obj.structure is None:
-            raise Warning("""To execute StructureGraphGenerator first is
+            raise Exception("""To execute StructureGraphGenerator first is
                                 needed that Protein has a structure model""")
-        else:
-            step = params["step"]
-            core_edges = set()
-            for t in obj.structure._get_core(step):
-                for e in combinations(t, 2):
-                    core_edges.add(e)
-            in_surf = {e: False for e in core_edges}
-            for t in obj.structure.get_simplices_by_step(step):
-                for e in combinations(t, 2):
-                    in_surf[e] = True
-            self.G.add_edges_from(
-                [(e[0], e[1],
-                  {'weight': obj.structure.get_edge_length(e),
-                   'in_surf': in_surf[e]}) for e in core_edges])
 
-            return self.G
+        step = params["step"]
+        core_edges = set()
+        for t in obj.structure._get_core(step):
+            for e in combinations(t, 2):
+                core_edges.add(e)
+        in_surf = {e: False for e in core_edges}
+        for t in obj.structure.get_simplices_by_step(step):
+            for e in combinations(t, 2):
+                in_surf[e] = True
+        self.G.add_edges_from(
+            [(e[0], e[1],
+                {'weight': obj.structure.get_edge_length(e),
+                'in_surf': in_surf[e]}) for e in core_edges])
+
+        # We'll need to keep track of atom ids.
+        for node_id in self.G.nodes:
+            self.G.nodes[node_id]["full_id"] = obj.structure.point_ids[node_id]
+
+        return self.G
+
+    def add_features(self, dataframe, columns = ["bfactor", "score", "color",
+            "color_confidence_interval_high", "color_confidence_interval_low",
+            "score_confidence_interval_high", "score_confidence_interval_low"]):
+        """
+        Add features to the structure graph based on a dataframe.
+        Dataframe must have full_id with standard Bio.PDB format. Features
+        are added based on the atom ids that were selected when the
+        Protein.structure was created.
+
+        Parameters
+        ----------
+        dataframe : pd.DataFrame
+            Dataframe to get features from.
+        columns : list
+            Columns to be included.
+
+        Returns
+        -------
+        nx.Graph
+        """
+        columns = [col for col in columns if col in dataframe.columns]
+
+        # In this graph, we identify each node by the ID of the point that
+        # was passed to the Delaunay algorithm.
+        for node_id in self.G.nodes:
+            full_id = self.G.nodes[node_id]["full_id"]
+
+            # Get a single atom row as a dict.
+            features = dataframe[dataframe.full_id == full_id].reset_index(drop=True)
+            features = {key:val[0] for key,val in features.to_dict().items()}
+
+            for col in columns:
+                self.G.nodes[node_id][col] = features[col]
+
+        return self.G
 
     '''def export_graphs(self, as_networkx, surface_graph):
         if as_networkx:

@@ -26,9 +26,11 @@ class Protein:
 
     @pdb.setter
     def pdb(self, pdb):
+        self.pdb_file = None
         if isinstance(pdb, Bio.PDB.Structure.Structure):
             self.__pdb = pdb
         elif isinstance(pdb, str):
+            self.pdb_file = pdb
             parser = PDBParser()
             # Infer pdb_id from filename
             pdb_id = pdb.split("/")[-1][:-4]
@@ -48,6 +50,7 @@ class Protein:
 
     def generate_graph(self, model, model_params):
         self.graph = model.generate_graph(self, model_params)
+        return self.graph
 
     def get_atoms(self, atom_as_dict=True, filter_atoms=lambda x: True,
                   filter_attr=lambda x: x):

@@ -1,8 +1,8 @@
 import requests
-from biocoso.io import Writer
+from pyprot.io import Writer
 import os
 import re
-from biocoso.url import *
+from pyprot.url import *
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -14,7 +14,7 @@ class StandardDownloader:
         """
         This class implements method for generic downloading from url objects
         :param ids_list: list of ids to be downloaded
-        :param url_object: object from biocoso.url
+        :param url_object: object from pyprot.url
         :param base_path: path where files will be downloaded
         """
         self.ids_list = ids_list
@@ -25,41 +25,64 @@ class StandardDownloader:
         self.downloaded_in_path = [re.findall("(.*)?[.]", i)[0].strip() for i in files_in_bp]
         self.downloaded_in_path.sort()
 
-    def request_and_write(self, create_dir_if_not_exists=False, use_dirname=False):
-        for id in self.ids_list:
-            try:
-                if id not in self.downloaded_in_path:
-                        sess = requests.Session()
-                        request = requests.Request(method=self.url_object.method.upper(),
-                                                   url=self.url_object.url.replace(self.url_object.mock_id, id))
-                        response = sess.send(request.prepare())
-                        if response.status_code == 200:
-                            if create_dir_if_not_exists:
-                                Writer(os.path.join(self.base_path, id + self.url_object.file_ext)).\
-                                    create_directory(use_dirname=use_dirname)
+    def do_make_request(self, id):
+        """
+        Makes a specific id request.
+        :param id: the id of the object being requested
+        :return: (file_extension, file_content) or (None, None) on error
+        """
+        sess = requests.Session()
+        request = requests.Request(method=self.url_object.method.upper(),
+                                    url=self.url_object.url.replace(self.url_object.mock_id, id))
+        response = sess.send(request.prepare())
+        if response.status_code == 200:
+            return self.url_object.file_ext, response.text
 
-                            Writer(os.path.join(self.base_path, id + self.url_object.file_ext)).write_str(response.text)
-                            print("ID:", id, "succesfully written")
-                        else:
-                            self.not_downloaded.append(id)
-                            print("ID:", id, "couldn't be written")
-                            print("Status Code:", response.status_code)
-                            print("Response:", response.text)
+        return None, None
+
+    def request_and_write(self, create_dir_if_not_exists = False, use_dirname = False, **kwargs):
+        """
+        This method downloads each id from self.ids_list and saves them to self.base_path. 
+        The request is made using self.do_make_request, and only the file extension and content
+        that it returns are used.
+        Additionally, it writes a file called "not_downloaded.txt" in the current working directory
+        to log the IDs that got an invalid response from the server.
+        :param create_dir_if_not_exists: bool (default: False)
+        :param use_dirname: bool (default: False)
+        :param **kwargs: additional keywords arguments to be passed on to do_make_request
+        :return: None
+        """
+        for id in self.ids_list:
+            if id in self.downloaded_in_path:
+                print("Previously downloaded id:", id)
+                continue
+            try:
+                file_ext, file_text = self.do_make_request(id, **kwargs)
+                if file_text is not None:
+                    if create_dir_if_not_exists:
+                        Writer(os.path.join(self.base_path, id + self.url_object.file_ext)).\
+                            create_directory(use_dirname=use_dirname)
+
+                    Writer(os.path.join(self.base_path, id + self.url_object.file_ext)).write_str(response.text)
+                    print("ID:", id, "succesfully written")
                 else:
-                    print("Previously downloaded id:", id)
+                    self.not_downloaded.append(id)
+                    print("ID:", id, "couldn't be written")
+                    print("Status Code:", response.status_code)
+                    print("Response:", response.text)
             except Exception as e:
                 print(e)
         Writer(os.path.join(self.base_path, "not_downloaded.txt")).write_str(str(self.not_downloaded))
 
 
-class PdbDownloader:
+class PdbDownloader(StandardDownloader):
 
     def __init__(self, ids_list=None, io_reader=None, pdb_url=PdbUrl("pdb_1"),
                  pdb_redo_url=PdbRedoUrl("pdbredo_3"), base_path="download"):
         """
         This class implements methods for downloading .pdb files
         Example:
-        from biocoso.downloader import PdbDownloader
+        from pyprot.downloader import PdbDownloader
         ids_list = ['19HC', '1A05','1A0J','1A0M','1A12','1A1X','1A27','1A2Z','1A3A']
         dw = PdbDownloader(ids_list)
         dw.request_and_write()
@@ -70,59 +93,42 @@ class PdbDownloader:
         :param pdb_redo_url: url.PdbRedoUrl object
         :param base_path: path where files will be downloaded
         """
-        #TODO: make IOReader object
-        #TODO: migrate some functionality to abstract Downloader class
-        self.pdb = pdb_url
-        self.pdb_redo = pdb_redo_url
-        self.base_path = base_path
-        self.not_downloaded = []
-        self.downloaded_in_path = [re.findall("(.*)?[.]",i)[0].strip() for i in os.listdir(self.base_path)]
-        self.downloaded_in_path.sort()
-        if io_reader is None:
-            self.ids_list = ids_list
-            self.type = None
-        else:
+        super().__init__(ids_list=ids_list, base_path = base_path)
+        self.type = None
+        if io_reader is not None:
             self.ids_list = io_reader.to_ids_list()
             self.type = io_reader.type
+
+        #TODO: make IOReader object
+
+        self.pdb = pdb_url
+        self.pdb_redo = pdb_redo_url
         self.url_to_complete = None
 
-    def request_and_write(self, try_redo=True):
+    def do_make_request(self, id, try_redo = True):
         """
-        This method downloads each pdb from self.ids_list and save them to self.base_path. You can set whether to get
-        files from PDB or from PDB-REDO, or first try to get it from PDB-REDO and, if it doesn't exists, then get it
-        from PDB. This is its default behaviour.
+        Download a pdb that matches the `id`.
+        You can set whether to get it from PDB or from PDB-REDO, or first try to get it from 
+        PDB-REDO and, if it doesn't exists, then get it from PDB. This is its default behaviour.
+        :param id: the id of the PDB being requested.
         :param try_redo: bool, if true first try to download data from PDB-REDO
-        :return: None
+        :return: (file_extension, file_content) or (None, None) on error.
         """
+        if try_redo:
+            response, file_ext = self.try_redo_then_pdb_(id)
+            if response.status_code == 200:
+                return file_ext, response.text
+        else:
+            new_url = self.pdb.url.replace(self.pdb.mock_id, id.strip().lower())
+            response = requests.get(new_url)
+            if response.status_code == 200:
+                return self.pdb.file_ext, response.text
 
-        for id in self.ids_list:
-            if id.strip() not in self.downloaded_in_path:
-                try:
-                    if try_redo:
-                        response, file_ext = self.try_redo_then_pdb_(id)
-                        if response.status_code == 200:
-                            Writer(os.path.join(self.base_path, id + file_ext)).write_str(response.text)
-                            print("ID:", id, "succesfully written")
-                    else:
-                        print("Entre")
-                        new_url = self.pdb.url.replace(self.pdb.mock_id, id.strip().lower())
-                        print(new_url)
-                        response = requests.get(new_url)
-                        if response.status_code == 200:
-                            Writer(os.path.join(self.base_path, id + self.pdb.file_ext)).write_str(response.text)
-                            print("ID:", id, "succesfully written")
-                        else:
-                            self.not_downloaded.append(id)
-                            print("ID:", id, "couldn't be written")
-                except Exception as e:
-                    print(e)
-            else:
-                print("Previously downloaded id:", id)
-        Writer(os.path.join(self.base_path, "not_downloaded.txt")).write_str(str(self.not_downloaded))
+        return None, None
 
     def try_redo_then_pdb_(self, id):
         """
-        Auxiliar method that first try to download the ID data from REDO and then from RCSB
+        Auxiliary method that first try to download the ID data from REDO and then from RCSB
         :param id: str, id of pdb file
         :return: request response, file extension
         """

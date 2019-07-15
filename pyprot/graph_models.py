@@ -8,10 +8,99 @@ import sys
 
 from pyprot.constants import valid_amino_3
 
-class StructureGraphGenerator:
+class GraphModel:
     def __init__(self):
         self.G = nx.Graph()
+    def generate_graph(self, protein, params):
+        raise NotImplementedError
+    def add_features(self, dataframe, columns):
+        raise NotImplementedError
+    def get_diffused_graph(self, aggregator = None, keys = None, steps = 1):
+        """Diffuses some `keys` features across graph neighbors that are
+        `steps` apart and afterwards process the groups using `aggregator`.
+        Diffused features end with "_n" with n being the steps to the node.
 
+        Parameters
+        ----------
+        aggregator: function or None
+            A function that receives a dictionary of list of diffused
+            features (e.g. {mass_1 => [1,12], mass_2 => [8,1,13]}) and
+            returns a new dictionary.
+            If None, non-numeric (i.e. not complex, int, float or bool)
+            features are discarded and numeric features are averaged.
+        keys: list
+            Features to be diffused. All nodes in graph must have them.
+        steps: int
+            Number of steps from each node to be used in diffusion.
+
+        Returns
+        -------
+        networkx.Graph with same structure as before but with additional
+        diffused features.
+        """
+        if keys is None:
+            some_node = list(self.G.nodes)[0]
+            keys = self.G.nodes[some_node].keys()
+
+        diffused_graph = self.G.copy()
+        # Setup feature holders.
+        for node_idx in diffused_graph.nodes:
+            for key in keys:
+                for dist in range(1, steps+1):
+                    diffused_graph.nodes[node_idx]["{}_{}".format(key, dist)] = list()
+
+        for node_idx in self.G.nodes:
+            # nx doesn't offer a bfs traversal that also yields distances,
+            # so we need to keep track of them.
+            distances = {node_idx: 0}
+            for origin, neighbor in nx.bfs_edges(self.G, node_idx):
+                distances[neighbor] = distances[origin] + 1
+                if distances[neighbor] > steps:
+                    break
+                for key in keys:
+                    neighbor_value = diffused_graph.nodes[neighbor][key]
+                    diffused_key = "{}_{}".format(key, distances[neighbor])
+                    try:
+                        diffused_graph.nodes[node_idx][diffused_key].append(neighbor_value)
+                    except KeyError:
+                        print(neighbor_value)
+                        print(keys)
+                        print(diffused_key)
+                        print(diffused_graph.nodes[node_idx])
+                        return
+
+        # Process feature lists with an aggregator.
+        for node_idx in diffused_graph.nodes:
+            node_features = diffused_graph.nodes[node_idx].copy()
+            diffused_features = {key:node_features[key]
+                for key in node_features.keys()
+                if key not in keys}
+
+            if aggregator is None:
+                # Basic aggregator. If the type is numeric-like then do a mean, otherwise
+                # discard it.
+                for diffused_key in diffused_features.keys():
+                    feature_list = diffused_features[diffused_key]
+                    if isinstance(feature_list[0], (int, float, complex)):
+                        diffused_features[diffused_key] = sum(feature_list)/len(feature_list)
+                    else:
+                        del diffused_features[diffused_key]
+
+            else:
+                diffused_features = aggregator(diffused_features)
+
+            # We can't replace the dict object, so here:
+            diffused_graph.nodes[node_idx].clear()
+            diffused_graph.nodes[node_idx].update(diffused_features)
+
+            # Add back the original node-specific values ("distance zero").
+            for key in keys:
+                diffused_graph.nodes[node_idx][key] = node_features[key]
+
+        return diffused_graph
+
+
+class StructureGraphGenerator(GraphModel):
     def generate_graph(self, obj, params):
         if obj.structure is None:
             raise Exception("""To execute StructureGraphGenerator first is
@@ -85,9 +174,7 @@ class StructureGraphGenerator:
             if as_adjancency:
                 results["surface_adjacency"] = [i for i in G_surf.adjacency()]'''
 
-class StaticContactGraphGenerator:
-    def __init__(self):
-        self.G = nx.Graph()
+class StaticContactGraphGenerator(GraphModel):
     def _parse_geometric_criteria(self, geom):
         """
         Set sensible defaults for the geometric parameters of the model.

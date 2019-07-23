@@ -1,15 +1,26 @@
+import operator
 import numpy as np
 import pandas as pd
-import operator
 import Bio
 from Bio import pairwise2
 from Bio.PDB import PDBParser
 from pyprot.structure import StructureModel
+from pyprot.downloader import PdbDownloader
 from pyprot.constants import amino_1code, valid_amino_3, valid_amino_1
 from pyprot import alignment
 
 
 class Protein:
+    @staticmethod
+    def fetch(pdb_id, base_path="."):
+        """Fetch a PDB file and instantiate a Protein with it."""
+        dw = PdbDownloader([pdb_id], base_path = base_path)
+        filenames = dw.request_and_write()
+        print(filenames)
+        if filenames[0] is not None:
+            return Protein(filenames[0])
+        raise Exception("PDB could not be downloaded")
+
     def __init__(self, pdb):
         self.pdb = pdb
         self.structure = None

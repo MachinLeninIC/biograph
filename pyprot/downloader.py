@@ -5,25 +5,33 @@ import re
 from pyprot.url import *
 import requests
 import pandas as pd
-from bs4 import BeautifulSoup
-
 
 class StandardDownloader:
 
-    def __init__(self, ids_list=None, url_object=None, base_path="download"):
+    def __init__(self, ids_list=None, url_object=None, base_path="download", force_download=False):
         """
         This class implements method for generic downloading from url objects
-        :param ids_list: list of ids to be downloaded
-        :param url_object: object from pyprot.url
-        :param base_path: path where files will be downloaded
+        Parameters
+        ----------
+        ids_list: list
+            list of ids to be downloaded
+        url_object: pyprot.url
+        base_path: str
+            path where files will be downloaded
+        force_download: bool
+            force download of files, even if they match a file
         """
         self.ids_list = ids_list
         self.url_object = url_object
         self.base_path = base_path
-        self.not_downloaded = []
-        files_in_bp = (f for f in os.listdir(self.base_path) if os.path.isfile(os.path.join(self.base_path, f)))
-        self.downloaded_in_path = [re.findall("(.*)?[.]", i)[0].strip() for i in files_in_bp]
-        self.downloaded_in_path.sort()
+        self.force_download = force_download
+
+        # Make a map of id => filename for ids that have already been downloaded.
+        files_in_bp = (f for f in os.listdir(self.base_path)
+            if os.path.isfile(os.path.join(self.base_path, f)))
+
+        self.downloaded_files = {fn.split(".")[0].strip().lower() : os.path.join(self.base_path, fn)
+            for fn in files_in_bp}
 
     def do_make_request(self, id):
         """
@@ -31,6 +39,7 @@ class StandardDownloader:
         :param id: the id of the object being requested
         :return: (file_extension, file_content) or (None, None) on error
         """
+
         sess = requests.Session()
         request = requests.Request(method=self.url_object.method.upper(),
                                     url=self.url_object.url.replace(self.url_object.mock_id, id))
@@ -41,38 +50,50 @@ class StandardDownloader:
         return None, None
 
     def request_and_write(self, create_dir_if_not_exists = False, use_dirname = False, **kwargs):
-        """
-        This method downloads each id from self.ids_list and saves them to self.base_path. 
+        """Request IDs and write them to disk.
+        This method downloads each id from self.ids_list and saves them to self.base_path.
         The request is made using self.do_make_request, and only the file extension and content
         that it returns are used.
-        Additionally, it writes a file called "not_downloaded.txt" in the current working directory
-        to log the IDs that got an invalid response from the server.
-        :param create_dir_if_not_exists: bool (default: False)
-        :param use_dirname: bool (default: False)
-        :param **kwargs: additional keywords arguments to be passed on to do_make_request
-        :return: None
-        """
-        for id in self.ids_list:
-            if id in self.downloaded_in_path:
-                print("Previously downloaded id:", id)
-                continue
-            try:
-                file_ext, file_text = self.do_make_request(id, **kwargs)
-                if file_text is not None:
-                    if create_dir_if_not_exists:
-                        Writer(os.path.join(self.base_path, id + self.url_object.file_ext)).\
-                            create_directory(use_dirname=use_dirname)
 
-                    Writer(os.path.join(self.base_path, id + self.url_object.file_ext)).write_str(response.text)
-                    print("ID:", id, "succesfully written")
-                else:
-                    self.not_downloaded.append(id)
-                    print("ID:", id, "couldn't be written")
-                    print("Status Code:", response.status_code)
-                    print("Response:", response.text)
-            except Exception as e:
-                print(e)
-        Writer(os.path.join(self.base_path, "not_downloaded.txt")).write_str(str(self.not_downloaded))
+        Parameters
+        ----------
+        create_dir_if_not_exists: bool
+            (default: False)
+        use_dirname : bool
+            (default: False)
+        **kwargs:
+            additional keywords arguments to be passed on to do_make_request
+
+        Returns
+        -------
+        List
+            Each element has the filename of the corresponding element in the ids_list,
+            or None if that id couldn't be downloaded.
+        """
+        files_list = []
+        for id in self.ids_list:
+            if id.lower() in self.downloaded_files.keys() and not self.force_download:
+                print("Previously downloaded id:", id)
+                files_list.append(self.downloaded_files[id.lower()])
+                continue
+
+            file_ext, file_text = self.do_make_request(id, **kwargs)
+            if file_text is not None:
+                filename = os.path.join(self.base_path, id + file_ext)
+                if create_dir_if_not_exists:
+                    Writer(os.path.join(filename)).\
+                        create_directory(use_dirname=use_dirname)
+
+                Writer(filename).write_str(file_text)
+                files_list.append(filename)
+            else:
+                files_list.append(None)
+                print("ID:", id, "couldn't be written")
+                print("Status Code:", response.status_code)
+                print("Response:", response.text)
+
+        return files_list
+
 
 
 class PdbDownloader(StandardDownloader):
@@ -108,12 +129,13 @@ class PdbDownloader(StandardDownloader):
     def do_make_request(self, id, try_redo = True):
         """
         Download a pdb that matches the `id`.
-        You can set whether to get it from PDB or from PDB-REDO, or first try to get it from 
+        You can set whether to get it from PDB or from PDB-REDO, or first try to get it from
         PDB-REDO and, if it doesn't exists, then get it from PDB. This is its default behaviour.
         :param id: the id of the PDB being requested.
         :param try_redo: bool, if true first try to download data from PDB-REDO
         :return: (file_extension, file_content) or (None, None) on error.
         """
+
         if try_redo:
             response, file_ext = self.try_redo_then_pdb_(id)
             if response.status_code == 200:

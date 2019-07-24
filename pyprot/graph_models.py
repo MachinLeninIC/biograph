@@ -1,4 +1,5 @@
 import networkx as nx
+import pandas as pd
 from itertools import combinations
 from getcontacts.contact_calc.compute_contacts import compute_contacts
 from getcontacts.contact_calc import transformations
@@ -15,6 +16,10 @@ class GraphModel:
         raise NotImplementedError
     def add_features(self, dataframe, columns):
         raise NotImplementedError
+    @staticmethod
+    def graph_to_dataframe(G):
+        return pd.DataFrame.from_dict({node_idx: {feature: val for feature,val in G.nodes[node_idx].items()}
+              for node_idx in G.nodes}, orient="index")
     def get_diffused_graph(self, aggregator = None, keys = None, steps = 1):
         """Diffuses some `keys` features across graph neighbors that are
         `steps` apart and afterwards process the groups using `aggregator`.

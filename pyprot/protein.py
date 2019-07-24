@@ -361,3 +361,15 @@ class Protein:
             df["x"], df["y"], df["z"] = zip(*df.coord.apply(
                 lambda x: self.__get_coordinates(x, raise_error)))
         self._df = df
+
+    def select_chains(self, chain_list):
+        """Discards rows from the dataframe that are not in the chainlist."""
+        self.df = self.df[self.df.chain.isin(chain_list)]
+
+    def discard_ligands(self):
+        """Discards rows from the dataframe that correspond to ligands or
+        heterogen atoms.
+        For more information read about the HET section in PDB files."""
+        het_rows = self.df.res_full_id.apply(
+            lambda res: res[3][0] == "W" or res[3][0][0:2] == "H_")
+        self.df = self.df.loc[~het_rows]

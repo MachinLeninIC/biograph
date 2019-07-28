@@ -1,11 +1,12 @@
 import numpy as np
-from Bio import pairwise2
-import operator
-from pyprot.structure import StructureModel
-import Bio
 import pandas as pd
+import operator
+import Bio
+from Bio import pairwise2
 from Bio.PDB import PDBParser
+from pyprot.structure import StructureModel
 from pyprot.constants import amino_1code, valid_amino_3, valid_amino_1
+from pyprot import alignment
 
 
 class Protein:
@@ -19,7 +20,9 @@ class Protein:
         if self._df is None:
             self.generate_dataframe()
         return self._df
-
+    @df.setter
+    def df(self, df):
+        self._df = df
     @property
     def pdb(self):
         return self.__pdb
@@ -204,47 +207,55 @@ class Protein:
                    self.pdb.get_residues()]
         return bfactor
 
-    def read_conservation(self, path, chain_list):
-        # TODO: mover a un modulo externals o algo asi
-        ##Alineación
-        with open(path, 'r') as ifile:
-            thelines = [x.rstrip('\n') for x in ifile.readlines()]
-            thelines = [x.split('\t') for x in thelines]
-            thelines = [x for x in thelines if len(x) == 14]
-        if not thelines:
-            return None
-        seqSelf = ''.join([amino_1code(r.resname) for r in self.get_residues() 
-                        if valid_amino_3(r.resname) and r.parent.id in chain_list])
-        seqCS = ''.join([y[1].lstrip() for y in thelines])
-        alignment = max(pairwise2.align.globalxx(seqSelf, seqCS), key=operator.itemgetter(1))
-        seqSelf, seqCS, _, _, _ = alignment
-        enumres = enumerate([r for r in self.get_residues()
-                             if valid_amino_3(r.resname) and r.parent.id in chain_list])
-        thelines.reverse() # to pop() first element first
-        prot_conservation = []
-        count_good = 0
-        count_bad = 0
-        #Join de cosas.
-        for x,y in zip(seqSelf, seqCS):
-            res_conservation = {}
-            i, res = next(enumres) if x != '-' else (-1, None)
-            line = thelines.pop() if y != '-' else None
-            if res and line:
-                res_conservation["res_full_id"] = res.full_id
-                res_conservation["score"] = float(line[3])
-                res_conservation["color"] = line[5]
-                res_conservation["score_confidence_interval"] = line[6]
-                res_conservation["color_confidence_interval"] = line[9]
-                res_conservation["residue_variety"] = line[-1]
-                count_good += 1
-                prot_conservation.append(res_conservation)
-                if valid_amino_1(res.resname) and (
-                    amino_1code(res.resname) != x or x != y or y != line[1].lstrip()):
-                    # No se alineó realmente
-                    print((x, y, i, res.resname, line[:3]))  # should never happen
-                    count_bad += 1
+    def get_conservation_features(self, path, chain_list = None):
+        """
+        Calculates conservation features from aligning the sequence in the consurf file
+        located in `path`. Features are those specified in alignment.join_conservation_data.
+        Returns a dict that maps this protein's residue full ids to conservation features.
 
-        return prot_conservation, seqSelf, seqCS
+        Parameters
+        ----------
+        path: string
+            Full path to consurf grades file.
+        chain_list: list or None
+            List of chains to be considered for alignment, or None if you want to align all of
+            them. Each chain is aligned separately.
+        Returns
+        -------
+        all_features: dict
+            Maps res_full_ids to features. Format is taken from alignment.join_conservation_data
+        """
+        all_features = {}
+        if chain_list is None:
+            chain_list = set([r.parent.id for r in self.get_residues()])
+        for chain in chain_list:
+            valid_residues = [r for r in self.get_residues()
+                if valid_amino_3(r.resname) and r.parent.id == chain]
+            self_sequence = ''.join([amino_1code(r.resname) for r in valid_residues])
+            features = {r.full_id:dict() for r in valid_residues}
+            # Join feature through alignment of sequences.
+            features = alignment.join_conservation_data(self_sequence, features, path)
+            all_features.update(features)
+        return all_features
+
+    def add_residue_features(self, features):
+        """
+        Adds residue-level features to the dataframe.
+
+        Parameters
+        ----------
+        features: dict
+            Dictionary mapping residue full ids to new features.
+
+        Returns
+        -------
+        None
+        """
+        self.df = pd.concat(
+            [self.df, self.df.apply(
+                lambda row: features[row["res_full_id"]] if row["res_full_id"] in features else None,
+                axis = 1, result_type="expand")],
+            axis=1)
 
     @staticmethod
     def distance_bet_res(r1, r2):
@@ -286,7 +297,8 @@ class Protein:
 
     def generate_dataframe(self,
                            columns=["bfactor", "chain", "coord",
-                                    "disordered_flag", "element", "full_id",
+                                    "disordered_flag", "element",
+                                    "full_id", "res_full_id",
                                     "mass", "resname", "occupancy"],
                            split_coordinates=True, raise_error=False):
         """ Generate a Pandas DataFrame from the PDB
@@ -312,6 +324,7 @@ class Protein:
                     for atom in residue:
                         atom_i = atom.__dict__
                         atom_i["resname"] = residue.resname
+                        atom_i["res_full_id"] = residue.full_id
                         atom_i["chain"] = chain.id
                         atom_i["model"] = str(model.id)
                         full_atom.append(atom_i)

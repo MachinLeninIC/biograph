@@ -17,13 +17,19 @@ class StructureModel:
 
     Parameters
     ----------
-    points : list or list-like
+    point_ids : list or list-like
+        Identifier for each item in points. Useful for understanding the
+        results of the structure model.
+    points : list, np.ndarray or pd.Series
         List or list-like of lists in which each element has three coordinates.
+        In case of providing a pd.Series, the elements must be np.ndarrays.
 
     Attributes
     ----------
-    points : list or list-like
-        List or list-like of lists in which each element has three coordinates.
+    point_ids: list-like
+        A list-like structure for identifying each coordinate row (see `points`).
+    points : np.ndarray
+        Point coordinate matrix.
     simplices_order : np.ndarray
         Order of simplices as computed by Delaunay
     persistent_hom_params : dict
@@ -32,8 +38,9 @@ class StructureModel:
         Delaunay object used for triangulation of points.
     """
 
-    def __init__(self, points):
-        self.__points = points
+    def __init__(self, point_ids, points):
+        self.point_ids = point_ids
+        self.points = points
         self.simplices_order = None
         self.persistent_hom_params = {}
         self.delaunay = None
@@ -46,11 +53,16 @@ class StructureModel:
 
     @points.setter
     def points(self, points):
-        # TODO: check if its working properly
-        # TODO: must admit list and series too
-        assert isinstance(points, np.ndarray), """A Numpy array matrix must be
-                                                        used for points"""
-        self.__points = points
+        if isinstance(points, pd.Series):
+            if not isinstance(points[0], np.ndarray):
+                raise Exception("If providing a pd.Series as points the elements must be numpy arrays.")
+            self.__points = np.stack(points.values)
+        elif isinstance(points, np.ndarray):
+            self.__points = points
+        elif isinstance(points, list):
+            self.__points = np.stack(np.array(point) for point in points)
+        else:
+            raise Exception("points must be a list, a numpy matrix or a pd.Series of numpy arrays")
 
     @points.deleter
     def points(self):

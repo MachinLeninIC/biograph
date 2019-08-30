@@ -20,7 +20,8 @@ class GraphModel:
     def graph_to_dataframe(G):
         return pd.DataFrame.from_dict({node_idx: {feature: val for feature,val in G.nodes[node_idx].items()}
               for node_idx in G.nodes}, orient="index")
-    def get_diffused_graph(self, aggregator = None, keys = None, steps = 1):
+    @staticmethod
+    def get_diffused_graph(G, aggregator = None, keys = None, steps = 1):
         """Diffuses some `keys` features across graph neighbors that are
         `steps` apart and afterwards process the groups using `aggregator`.
         Diffused features end with "_n" with n being the steps to the node.
@@ -44,21 +45,21 @@ class GraphModel:
         diffused features.
         """
         if keys is None:
-            some_node = list(self.G.nodes)[0]
-            keys = self.G.nodes[some_node].keys()
+            some_node = list(G.nodes)[0]
+            keys = G.nodes[some_node].keys()
 
-        diffused_graph = self.G.copy()
+        diffused_graph = G.copy()
         # Setup feature holders.
         for node_idx in diffused_graph.nodes:
             for key in keys:
                 for dist in range(1, steps+1):
                     diffused_graph.nodes[node_idx]["{}_{}".format(key, dist)] = list()
 
-        for node_idx in self.G.nodes:
+        for node_idx in G.nodes:
             # nx doesn't offer a bfs traversal that also yields distances,
             # so we need to keep track of them.
             distances = {node_idx: 0}
-            for origin, neighbor in nx.bfs_edges(self.G, node_idx):
+            for origin, neighbor in nx.bfs_edges(G, node_idx):
                 distances[neighbor] = distances[origin] + 1
                 if distances[neighbor] > steps:
                     break
@@ -84,12 +85,11 @@ class GraphModel:
             if aggregator is None:
                 # Basic aggregator. If the type is numeric-like then do a mean, otherwise
                 # discard it.
+                diffused_features = {k:v for k,v in diffused_features.items()
+                    if isinstance(v[0], (int, float, complex))}
                 for diffused_key in diffused_features.keys():
                     feature_list = diffused_features[diffused_key]
-                    if isinstance(feature_list[0], (int, float, complex)):
-                        diffused_features[diffused_key] = sum(feature_list)/len(feature_list)
-                    else:
-                        del diffused_features[diffused_key]
+                    diffused_features[diffused_key] = sum(feature_list)/len(feature_list)
 
             else:
                 diffused_features = aggregator(diffused_features)

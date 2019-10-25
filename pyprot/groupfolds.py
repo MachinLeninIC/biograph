@@ -11,18 +11,12 @@ class CDHitGroup:
         """Given a list of pyprot.Protein objects, runs CDHit
         to cluster sequences based on similarity.
         CDHit must be installed for this method to work."""
-        builder = PDB.Polypeptide.PPBuilder()
         sequences = []
         names = []
         for p in proteins:
             chains = p.pdb[0].get_list()
-            for i, pp in enumerate(builder.build_peptides(p.pdb, aa_only=0)):
-                sequences.append(str(pp.get_sequence()))
-                try:
-                    names.append("{}_{}".format(p.pdb.id, chains[i].id))
-                except IndexError:
-                    print("Index error while processing protein ID {}".format(p.pdb.id))
-                    print("Check that biopython finds as many sequences as chains there are")
+            sequences.extend(p.sequences)
+            names.extend(["{}_{}".format(p.pdb.id, chain.id) for chain in chains])
 
         temppath = tempfile.mkdtemp()
         seqfile = os.path.join(temppath, "sequences.fasta.txt")

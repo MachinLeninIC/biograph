@@ -59,6 +59,7 @@ class GraphModel:
             # nx doesn't offer a bfs traversal that also yields distances,
             # so we need to keep track of them.
             distances = {node_idx: 0}
+            new_keys = set()
             for origin, neighbor in nx.bfs_edges(G, node_idx):
                 distances[neighbor] = distances[origin] + 1
                 if distances[neighbor] > steps:
@@ -66,6 +67,7 @@ class GraphModel:
                 for key in keys:
                     neighbor_value = diffused_graph.nodes[neighbor][key]
                     diffused_key = "{}_{}".format(key, distances[neighbor])
+                    new_keys.add(diffused_key)
                     try:
                         diffused_graph.nodes[node_idx][diffused_key].append(neighbor_value)
                     except KeyError:
@@ -78,9 +80,10 @@ class GraphModel:
         # Process feature lists with an aggregator.
         for node_idx in diffused_graph.nodes:
             node_features = diffused_graph.nodes[node_idx].copy()
-            diffused_features = {key:node_features[key]
-                for key in node_features.keys()
-                if key not in keys}
+
+            diffused_features = {key:val
+                for key, val in node_features.items()
+                if key in new_keys}
 
             if aggregator is None:
                 # Basic aggregator. If the type is numeric-like then do a mean, otherwise
@@ -98,9 +101,11 @@ class GraphModel:
             diffused_graph.nodes[node_idx].clear()
             diffused_graph.nodes[node_idx].update(diffused_features)
 
-            # Add back the original node-specific values ("distance zero").
-            for key in keys:
-                diffused_graph.nodes[node_idx][key] = node_features[key]
+            # Add back the original node-specific values ("distance zero" and ignored
+            # columns).
+            for key in node_features.keys():
+                if key not in new_keys:
+                    diffused_graph.nodes[node_idx][key] = node_features[key]
 
         return diffused_graph
 

@@ -25,15 +25,38 @@ class Protein:
         self.pdb = pdb
         self.structure = None
         self._df = None
+        self._seq = None
 
     @property
     def df(self):
         if self._df is None:
             self.generate_dataframe()
         return self._df
+
     @df.setter
     def df(self, df):
         self._df = df
+
+    @property
+    def sequences(self):
+        """Tries to load the sequences from the PDB file if present.
+        It is also possible to use a PPBuilder for this, but sometimes
+        it breaks up a sequence into smaller parts and they stop
+        matching with the FASTA files."""
+        if self._seq is not None:
+            return self._seq
+
+        if self.pdb_file is None:
+            return None
+
+        import Bio.SeqIO
+        self._seq = []
+        with open(self.pdb_file, "rU") as handle:
+            for record in Bio.SeqIO.parse(handle, "pdb-seqres"):
+                self._seq.append(record.seq)
+
+        return self._seq
+
     @property
     def pdb(self):
         return self.__pdb

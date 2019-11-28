@@ -8,7 +8,7 @@ class CDHitGroup:
 
     @staticmethod
     def get_group(proteins, similarity=0.9, word_size=5, memory_mb=1024, threads=1):
-        """Given a list of pyprot.Protein objects, runs CDHit
+        """Given a list of biograph.Protein objects, runs CDHit
         to cluster sequences based on similarity.
         CDHit must be installed for this method to work."""
         sequences = []

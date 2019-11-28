@@ -4,10 +4,10 @@ import pandas as pd
 import Bio
 from Bio import pairwise2
 from Bio.PDB import PDBParser
-from pyprot.structure import StructureModel
-from pyprot.downloader import PdbDownloader
-from pyprot.constants import amino_1code, valid_amino_3, valid_amino_1
-from pyprot import alignment
+from biograph.structure import StructureModel
+from biograph.downloader import PdbDownloader
+from biograph.constants import amino_1code, valid_amino_3, valid_amino_1
+from biograph import alignment
 
 
 class Protein:

@@ -1,7 +1,7 @@
 from Bio.PDB import PDBParser
-from pyprot.protein import Protein
-from pyprot.structure import StructureModel
-from pyprot.structure import Perseus
+from biograph.protein import Protein
+from biograph.structure import StructureModel
+from biograph.structure import Perseus
 import numpy as np
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import gc
 gc.collect()
 parser = PDBParser()
-pdb = parser.get_structure("1a3z","/home/usuario/Documentos/github/pyprot/tests/1A3Z.pdb")
+pdb = parser.get_structure("1a3z","/home/usuario/Documentos/github/biograph/tests/1A3Z.pdb")
 import pandas as pd
 prot = Protein(pdb, generate_dataframe=False)
 prot.head()

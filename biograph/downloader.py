@@ -1,8 +1,8 @@
 import requests
-from pyprot.io import Writer
+from biograph.io import Writer
 import os
 import re
-from pyprot.url import *
+from biograph.url import *
 import requests
 import pandas as pd
 
@@ -15,7 +15,7 @@ class StandardDownloader:
         ----------
         ids_list: list
             list of ids to be downloaded
-        url_object: pyprot.url
+        url_object: biograph.url
         base_path: str
             path where files will be downloaded
         force_download: bool
@@ -33,23 +33,37 @@ class StandardDownloader:
         self.downloaded_files = {fn.split(".")[0].strip().lower() : os.path.join(self.base_path, fn)
             for fn in files_in_bp}
 
-    def do_make_request(self, id):
-        """
-        Makes a specific id request.
-        :param id: the id of the object being requested
-        :return: (file_extension, file_content) or (None, None) on error
+    def do_make_request(self, id, timeout = 5.0):
+        """Makes a specific id request.
+
+        Parameters
+        ----------
+        id:
+            id of the object being requested
+        timeout: float
+            (default: 5.0)
+
+        Returns
+        -------
+        (file_extension, file_content) or (None, None) on error
         """
 
         sess = requests.Session()
         request = requests.Request(method=self.url_object.method.upper(),
                                     url=self.url_object.url.replace(self.url_object.mock_id, id))
-        response = sess.send(request.prepare())
+        response = sess.send(request.prepare(), timeout = timeout)
         if response.status_code == 200:
             return self.url_object.file_ext, response.text
+        if response.status_code == 404:
+            print("Got anomalous status code({}) -- not found".format(response.status_code))
+        else:
+            print("Got anomalous status code ({}) -- {}".format(response.status_code, response.text))
+        print("For URL {}" . format(request.url))
 
         return None, None
 
-    def request_and_write(self, create_dir_if_not_exists = False, use_dirname = False, **kwargs):
+    def request_and_write(self, create_dir_if_not_exists = False, use_dirname = False,
+        timeout = 5.0, **kwargs):
         """Request IDs and write them to disk.
         This method downloads each id from self.ids_list and saves them to self.base_path.
         The request is made using self.do_make_request, and only the file extension and content
@@ -68,16 +82,17 @@ class StandardDownloader:
         -------
         List
             Each element has the filename of the corresponding element in the ids_list,
-            or None if that id couldn't be downloaded.
+            including the base path, or None if that id couldn't be downloaded.
         """
         files_list = []
         for id in self.ids_list:
-            if id.lower() in self.downloaded_files.keys() and not self.force_download:
+            urlid = id.replace("/", "_")
+            if urlid.lower() in self.downloaded_files.keys() and not self.force_download:
                 print("Previously downloaded id:", id)
-                files_list.append(self.downloaded_files[id.lower()])
+                files_list.append(self.downloaded_files[urlid.lower()])
                 continue
 
-            file_ext, file_text = self.do_make_request(id, **kwargs)
+            file_ext, file_text = self.do_make_request(urlid, **kwargs)
             if file_text is not None:
                 filename = os.path.join(self.base_path, id + file_ext)
                 if create_dir_if_not_exists:
@@ -89,8 +104,6 @@ class StandardDownloader:
             else:
                 files_list.append(None)
                 print("ID:", id, "couldn't be written")
-                print("Status Code:", response.status_code)
-                print("Response:", response.text)
 
         return files_list
 
@@ -103,7 +116,7 @@ class PdbDownloader(StandardDownloader):
         """
         This class implements methods for downloading .pdb files
         Example:
-        from pyprot.downloader import PdbDownloader
+        from biograph.downloader import PdbDownloader
         ids_list = ['19HC', '1A05','1A0J','1A0M','1A12','1A1X','1A27','1A2Z','1A3A']
         dw = PdbDownloader(ids_list)
         dw.request_and_write()
@@ -219,35 +232,18 @@ class CapriDownloader:
 
 class ConsurfDBDownloader(StandardDownloader):
 
-    def __init__(self, consurf_equivalence_dict, ids_list=None, consurf_url_object=ConsurfDBUrl(), base_path="ConsurfDB"):
+    def __init__(self, id_chain_dict, consurf_url_object=ConsurfDBUrl(), base_path="ConsurfDB"):
         """
-        Class used for downloading data from ConsurfDB
-        :param ids_list: ids of pdb files and chains in the format PDB_CHAIN. For example
-        :param consurf_url_object:
-        :param pdbaa_list_path:
+        Data downloader for conservation data (ConsurfDB).
+        Parameters
+        ----------
+        id_chain_dict: dict
+            Dictionary mapping protein IDs to iterable of chains IDs to be downloaded.
+        consurf_url_object: Url
+        base_path: string
         """
-        self.consurf_equivalence_dict = consurf_equivalence_dict
+        #NoneType is not iterable. (ids_list)
         StandardDownloader.__init__(self, ids_list=None, url_object=consurf_url_object, base_path=base_path)
-        self.ids_list, self.not_matched, self.more_than_one_match = self.get_processed_ids_list_(ids_list)
-
-
-    def get_processed_ids_list_(self, ids_list):
-        new_list = []
-        not_matched = []
-        more_than_one_match = []
-        for pdb_chain in ids_list:
-            pdb_ref = [k for k in self.consurf_equivalence_dict.keys() if pdb_chain in self.consurf_equivalence_dict[k]]
-            if not pdb_ref:
-                print("PDB id wasn't matched")
-                not_matched.append(pdb_chain)
-            elif len(pdb_ref) > 1:
-                print("There is more than one match, using the first one:", pdb_ref)
-                more_than_one_match.append(pdb_chain)
-                pdb_ref = pdb_ref[0].replace("_","/")
-                new_list.append(pdb_ref)
-                new_list = list(set(new_list))
-            else:
-                pdb_ref = pdb_ref[0].replace("_", "/")
-                new_list.append(pdb_ref)
-                new_list = list(set(new_list))
-        return new_list, not_matched, more_than_one_match
+        self.ids_list = [pid.upper()+"_"+chain.upper()
+            for pid, chains in id_chain_dict.items()
+            for chain in chains]

@@ -4,8 +4,8 @@ from itertools import combinations, chain
 import os
 import subprocess
 import networkx as nx
-from pyprot.io import Writer
-import pyprot
+from biograph.io import Writer
+import biograph
 import matplotlib.pyplot as plt
 import pandas as pd
 from mpl_toolkits import mplot3d
@@ -419,7 +419,7 @@ class Perseus:
             It may be the case that you are interested in knowing when there
             is only one connected component, no holes and no cavities."""
         structure_ = structure
-        if isinstance(structure_, pyprot.protein.Protein):
+        if isinstance(structure_, biograph.protein.Protein):
             structure = structure.structure
 
         # TODO: validar que structure tenga datos
@@ -450,7 +450,11 @@ class Perseus:
             b3_step = b0_step
             for line in ifile.readlines()[1:]:
                 # first line is blank
-                i, h0, h1, h2, _ = [int(x) for x in line.split()]
+                try:
+                    i, h0, h1, h2, _ = [int(x) for x in line.split()]
+                except ValueError:
+                    i, h0, h1, h2 = [int(x) for x in line.split()]
+
                 if i >= b0_step and h0 == topology[0]:
 
                     # only modifies b0_step once
@@ -465,7 +469,7 @@ class Perseus:
                         b3_step = i
                         break
 
-        if isinstance(structure_, pyprot.protein.Protein):
+        if isinstance(structure_, biograph.protein.Protein):
             structure_.structure.persistent_hom_params["b0_step"] = b0_step
             structure_.structure.persistent_hom_params["b1_step"] = b1_step
             structure_.structure.persistent_hom_params["b2_step"] = b2_step

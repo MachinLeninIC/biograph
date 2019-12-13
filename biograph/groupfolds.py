@@ -25,7 +25,7 @@ class CDHitGroup:
                 f.write(">{}\n{}\n".format(name, seq))
 
         #TODO: check where cdhit is, or assert that cdhit is installed.
-        out = subprocess.run(["./cdhit/cd-hit",
+        out = subprocess.run(["./cdhit/cd-hita",
             "-i", seqfile, "-o", "output.txt",
             "-c", str(similarity), "-n", str(word_size),
             "-M", str(memory_mb), "-T", str(threads),

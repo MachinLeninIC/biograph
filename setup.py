@@ -1,6 +1,6 @@
 import os
 import subprocess
-from setuptools import setup
+from setuptools import setup, find_packages
 from distutils.command.build import build as DistutilsBuild
 from setuptools.command.install import install as SetuptoolsInstall
 
@@ -44,12 +44,13 @@ class BioGraphBuild(DistutilsBuild):
         #self.git_clone("https://github.com/Eigenstate/vmd-python", "VMD")
         self.git_clone("https://github.com/getcontacts/getcontacts", "GetContacts")
 
-        #subprocess.call(["make", "zlib=no"], cwd=os.path.join(os.getcwd(), "cdhit"))
+        subprocess.call(["make", "zlib=no"], cwd=os.path.join(os.getcwd(), "cdhit"))
+        subprocess.call(["mv", "cdhit", "biograph"])
         #subprocess.call(["python3", "setup.py", "build"], cwd=os.path.join(os.getcwd(), "vmd-python"))
         #subprocess.call(["python3", "setup.py", "install"], cwd=os.path.join(os.getcwd(), "vmd-python"))
         # vmd =>netcdf, tk
 
-        # perseus?
+        # TODO: compile perseus
 
         #requirements.txt
         DistutilsBuild.run(self)
@@ -71,10 +72,11 @@ setup(
     description="Represent proteins as graphs for machine learning",
     author="Leonardo Cordoba, Leandro Lombardi, Sebastian Prillo, Joaquin Torre Zaffaroni",
     author_email="joaquintorrezaffaroni@gmail.com",
-    packages=["biograph"],
+    packages=["biograph", "getcontacts", "getcontacts.contact_calc", "getcontacts.Applications"],
     package_data={
         "biograph": [
-            "*"
+            "perseus/*",
+            "cdhit/*"
         ]
     },
     cmdclass={

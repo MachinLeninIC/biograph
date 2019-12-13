@@ -1,4 +1,5 @@
 import operator
+import warnings
 import numpy as np
 import pandas as pd
 import Bio
@@ -12,16 +13,17 @@ from biograph import alignment
 
 class Protein:
     @staticmethod
-    def fetch(pdb_id, base_path="."):
+    def fetch(pdb_id, base_path=".", suppress_bio_warnings=True):
         """Fetch a PDB file and instantiate a Protein with it."""
         dw = PdbDownloader([pdb_id], base_path = base_path)
         filenames = dw.request_and_write()
         print(filenames)
         if filenames[0] is not None:
-            return Protein(filenames[0])
+            return Protein(filenames[0], suppress_bio_warnings=suppress_bio_warnings)
         raise Exception("PDB could not be downloaded")
 
-    def __init__(self, pdb):
+    def __init__(self, pdb, suppress_bio_warnings=True):
+        self.suppress_bio_warnings = suppress_bio_warnings
         self.pdb = pdb
         self.structure = None
         self._df = None
@@ -68,11 +70,15 @@ class Protein:
             self.__pdb = pdb
         elif isinstance(pdb, str):
             self.pdb_file = pdb
-            parser = PDBParser()
-            # Infer pdb_id from filename
-            pdb_id = pdb.split("/")[-1][:-4]
-            pdb = parser.get_structure(pdb_id, pdb)
-            self.__pdb = pdb
+            with warnings.catch_warnings():
+                if self.suppress_bio_warnings:
+                    warnings.warn("suppress_bio_warnings=True, ignoring Bio's warnings.")
+                    warnings.simplefilter("ignore")
+                parser = PDBParser()
+                # Infer pdb_id from filename
+                pdb_id = pdb.split("/")[-1][:-4]
+                pdb = parser.get_structure(pdb_id, pdb)
+                self.__pdb = pdb
         else:
             raise Exception("""A Bio.PDB.Structure.Structure or a
                             valid path must be used""")

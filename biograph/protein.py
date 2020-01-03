@@ -20,7 +20,7 @@ class Protein:
         print(filenames)
         if filenames[0] is not None:
             with warnings.catch_warnings():
-                if self.suppress_bio_warnings:
+                if suppress_bio_warnings:
                     warnings.warn("suppress_bio_warnings=True, ignoring Bio's warnings.")
                     warnings.simplefilter("ignore")
                 return Protein(filenames[0], suppress_bio_warnings=suppress_bio_warnings)

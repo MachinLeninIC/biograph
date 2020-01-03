@@ -19,7 +19,11 @@ class Protein:
         filenames = dw.request_and_write()
         print(filenames)
         if filenames[0] is not None:
-            return Protein(filenames[0], suppress_bio_warnings=suppress_bio_warnings)
+            with warnings.catch_warnings():
+                if self.suppress_bio_warnings:
+                    warnings.warn("suppress_bio_warnings=True, ignoring Bio's warnings.")
+                    warnings.simplefilter("ignore")
+                return Protein(filenames[0], suppress_bio_warnings=suppress_bio_warnings)
         raise Exception("PDB could not be downloaded")
 
     def __init__(self, pdb, suppress_bio_warnings=True):

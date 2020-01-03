@@ -84,3 +84,13 @@ __pycache__/
 *.py[cod]
 
 # End of https://www.gitignore.io/api/pycharm
+#
+*.pdb
+*.txt
+output*
+vmd-python
+getcontacts
+cdhit
+*.ipynb_checkpoints/
+build
+MANIFEST.in

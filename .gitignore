@@ -87,10 +87,14 @@ __pycache__/
 #
 *.pdb
 *.txt
+*.swp
 output*
 vmd-python
 getcontacts
 cdhit
-*.ipynb_checkpoints/
 build
 MANIFEST.in
+*.ipynb_checkpoints/
+examples/.ipynb_checkpoints
+biograph/perseus/*.txt
+biograph/perseus/*.in

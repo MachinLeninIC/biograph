@@ -41,13 +41,13 @@ class BioGraphBuild(DistutilsBuild):
         # https://pip.readthedocs.io/en/1.1/requirements.html#requirements-file-format
         # if the package has a `setup.py develop` then it should work
         self.git_clone("https://github.com/weizhongli/cdhit", "CDHit")
-        #self.git_clone("https://github.com/Eigenstate/vmd-python", "VMD")
+        self.git_clone("https://github.com/Eigenstate/vmd-python", "VMD")
         self.git_clone("https://github.com/getcontacts/getcontacts", "GetContacts")
 
         subprocess.call(["make", "zlib=no"], cwd=os.path.join(os.getcwd(), "cdhit"))
         subprocess.call(["mv", "cdhit", "biograph"])
-        #subprocess.call(["python3", "setup.py", "build"], cwd=os.path.join(os.getcwd(), "vmd-python"))
-        #subprocess.call(["python3", "setup.py", "install"], cwd=os.path.join(os.getcwd(), "vmd-python"))
+        subprocess.call(["python3", "setup.py", "build"], cwd=os.path.join(os.getcwd(), "vmd-python"))
+        subprocess.call(["python3", "setup.py", "install"], cwd=os.path.join(os.getcwd(), "vmd-python"))
         # vmd =>netcdf, tk
 
         # TODO: compile perseus

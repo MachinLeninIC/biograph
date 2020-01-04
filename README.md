@@ -1,5 +1,6 @@
-# BioGraph
+# BioGraph 
 
+![](logo.png)
 
 BioGraph is a library for manipulating structures in PDB files as graphs,
 with the purpose of training machine learning models. Additionally

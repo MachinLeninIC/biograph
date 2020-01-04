@@ -1,6 +1,6 @@
 ![](logo.png)
 
-BioGraph is a library for manipulating structures in PDB files as graphs,
+BioGraph is a library for manipulating structures in PDB files as graphs
 with the purpose of training machine learning models. Additionally
 it provides functionality for making pipelines based on those graphs.
 It is based on [BioPython](https://github.com/biopython/biopython).
@@ -11,14 +11,14 @@ In short, this package provides the following functionality:
 generator. Different generators can be used to create different
 graphs. For example, one can generate a static contacts graph,
 or a graph that captures the topology of the protein (e.g.
-Delauney filtration).
+through Delauney filtration).
 
 * adding features to either the protein (represented as a pandas
-dataframe) or the graph through alignment.
+dataframe) or the graph through sequence alignment.
 
 * diffusing or propagating features along neighbors and optionally
-converting the end result to a dataframe for use in machine learning
-models that a priori take the graph structure as input.
+converting the end result to a dataframe, for use in machine learning
+models that a priori _do not_ take the graph structure as input.
 
 * making cross validation fold according to CDHit groups to avoid
 bias in training.
@@ -37,7 +37,16 @@ to automate these tasks, so just running:
 # python setup.py install
 ```
 
-should do the trick.
+should do the trick. This is a full installation, including the
+Visual Molecular Dynamics python package. Since that is a heavy
+package that is only used for static contact graph generation,
+you may wish to avoid installing it. That can be done by
+building first with the `ignore-vmd` flag:
+
+```
+# python setup.py build --ignore-vmd=yes
+# python setup.py install --skip-build
+```
 
 ### Examples
 

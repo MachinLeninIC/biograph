@@ -9,11 +9,13 @@ from setuptools.command.install import install as SetuptoolsInstall
 class BioGraphBuild(DistutilsBuild):
     """Build BioGraph dependencies"""
     description = "Build biograph dependencies"
-    user_options = []
+    user_options = DistutilsBuild.user_options + [("ignore-vmd=", None, "whether to ignore VMD during build (yes/no, default no)")]
     def initialize_options(self):
+        self.ignore_vmd = None
         DistutilsBuild.initialize_options(self)
 
     def finalize_options(self):
+        self.ignore_vmd = self.ignore_vmd == "yes"
         DistutilsBuild.finalize_options(self)
 
 
@@ -41,29 +43,29 @@ class BioGraphBuild(DistutilsBuild):
         # https://pip.readthedocs.io/en/1.1/requirements.html#requirements-file-format
         # if the package has a `setup.py develop` then it should work
         self.git_clone("https://github.com/weizhongli/cdhit", "CDHit")
-        self.git_clone("https://github.com/Eigenstate/vmd-python", "VMD")
         self.git_clone("https://github.com/getcontacts/getcontacts", "GetContacts")
 
+
         subprocess.call(["make", "zlib=no"], cwd=os.path.join(os.getcwd(), "cdhit"))
-        subprocess.call(["mv", "cdhit", "biograph"])
-        subprocess.call(["python3", "setup.py", "build"], cwd=os.path.join(os.getcwd(), "vmd-python"))
-        subprocess.call(["python3", "setup.py", "install"], cwd=os.path.join(os.getcwd(), "vmd-python"))
-        # vmd =>netcdf, tk
+        subprocess.call(["cp", "-r", "cdhit", "biograph"])
+
+        if not self.ignore_vmd:
+            self.git_clone("https://github.com/Eigenstate/vmd-python", "VMD")
+            subprocess.call(["python3", "setup.py", "build"], cwd=os.path.join(os.getcwd(), "vmd-python"))
+            subprocess.call(["python3", "setup.py", "install"], cwd=os.path.join(os.getcwd(), "vmd-python"))
 
         # TODO: compile perseus
-
-        #requirements.txt
         DistutilsBuild.run(self)
 
 class BioGraphInstall(SetuptoolsInstall):
     def initialize_options(self):
         SetuptoolsInstall.initialize_options(self)
 
+
     def finalize_options(self):
         SetuptoolsInstall.finalize_options(self)
 
     def run(self):
-        #self.run_command("build")
         SetuptoolsInstall.run(self)
 
 setup(

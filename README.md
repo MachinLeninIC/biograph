@@ -1,5 +1,3 @@
-# BioGraph 
-
 ![](logo.png)
 
 BioGraph is a library for manipulating structures in PDB files as graphs,

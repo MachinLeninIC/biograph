@@ -8,7 +8,7 @@ class CDHitGroup:
 
     @staticmethod
     def get_group(proteins, similarity=0.9, word_size=5, memory_mb=1024, threads=1):
-        """Given a list of pyprot.Protein objects, runs CDHit
+        """Given a list of biograph.Protein objects, runs CDHit
         to cluster sequences based on similarity.
         CDHit must be installed for this method to work."""
         sequences = []
@@ -24,8 +24,10 @@ class CDHitGroup:
             for name, seq in zip(names, sequences):
                 f.write(">{}\n{}\n".format(name, seq))
 
-        #TODO: check where cdhit is, or assert that cdhit is installed.
-        out = subprocess.run(["./cdhit/cd-hit",
+        MODULEDIR = os.path.dirname(os.path.abspath(__file__))
+        print("Using MODULEDIR="+MODULEDIR)
+        out = subprocess.run([
+            os.path.join(MODULEDIR, "cdhit", "cd-hit"),
             "-i", seqfile, "-o", "output.txt",
             "-c", str(similarity), "-n", str(word_size),
             "-M", str(memory_mb), "-T", str(threads),

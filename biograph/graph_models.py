@@ -7,7 +7,7 @@ from getcontacts.Applications.contact_network_analysis import create_graph
 import tempfile
 import sys
 
-from pyprot.constants import valid_amino_3
+from biograph.constants import valid_amino_3
 
 class GraphModel:
     def __init__(self):

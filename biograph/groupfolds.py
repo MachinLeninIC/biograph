@@ -7,17 +7,8 @@ import Bio.PDB as PDB
 class CDHitGroup:
 
     @staticmethod
-    def get_group(proteins, similarity=0.9, word_size=5, memory_mb=1024, threads=1):
-        """Given a list of biograph.Protein objects, runs CDHit
-        to cluster sequences based on similarity.
-        CDHit must be installed for this method to work."""
-        sequences = []
-        names = []
-        for p in proteins:
-            chains = p.pdb[0].get_list()
-            sequences.extend(p.sequences)
-            names.extend(["{}_{}".format(p.pdb.id, chain.id) for chain in chains])
-
+    def get_group_by_sequences(sequences, names, similarity=0.9, word_size=5, memory_mb=1024, threads=1):
+        """Same as get_group but manually providing sequences and names."""
         temppath = tempfile.mkdtemp()
         seqfile = os.path.join(temppath, "sequences.fasta.txt")
         with open(seqfile, "w") as f:
@@ -53,5 +44,22 @@ class CDHitGroup:
                     grouping[name] = current_cluster
                 line = f.readline()
 
-        groups = [grouping[name] for name in names]
+        # We use .get() since some chains passed to CDHit may not be in
+        # any cluster. This can happen if a chain is just a peptide or
+        # if it is empty. .get() returns None if it is not found, so
+        # the resulting list has the same len() as names.
+        groups = [grouping.get(name) for name in names]
         return groups
+    @staticmethod
+    def get_group(proteins, similarity=0.9, word_size=5, memory_mb=1024, threads=1):
+        """Given a list of biograph.Protein objects, runs CDHit
+        to cluster sequences based on similarity.
+        CDHit must be installed for this method to work."""
+        sequences = []
+        names = []
+        for p in proteins:
+            sequences.extend(p.sequences.values())
+            names.extend(p.sequences.keys())
+
+        return CDHitGroup.get_group_by_sequences(sequences, names, similarity=similarity,
+            word_size=word_size, memory_mb=memory_mb, threads=threads)

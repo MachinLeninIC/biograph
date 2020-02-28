@@ -112,9 +112,20 @@ class GraphModel:
 
 class StructureGraphGenerator(GraphModel):
     def generate_graph(self, obj, params):
+        """
+        Generates a graph from the structure model of the protein.
+        Protein.generate_graph double dispatches to this method.
+        Parameters
+        ----------
+        obj: Protein
+        params: dict
+            - step: step of the structure generator used to create the graph
+            - surface_only (optional, default False): whether to discard interior
+              points and edges or not.
+        """
         if obj.structure is None:
-            raise Exception("""To execute StructureGraphGenerator first is
-                                needed that Protein has a structure model""")
+            raise Exception("To execute StructureGraphGenerator first it is"
+                            "needed for the Protein to have a structure model")
 
         step = params["step"]
         core_edges = set()
@@ -125,14 +136,33 @@ class StructureGraphGenerator(GraphModel):
         for t in obj.structure.get_simplices_by_step(step):
             for e in combinations(t, 2):
                 in_surf[e] = True
-        self.G.add_edges_from(
-            [(e[0], e[1],
+        if params.get("surface_only", False):
+            self.G.add_edges_from([(
+                e[0],
+                e[1],
                 {'weight': obj.structure.get_edge_length(e),
-                'in_surf': in_surf[e]}) for e in core_edges])
+                'in_surf': in_surf[e]})
+                for e in core_edges if in_surf[e]])
+        else:
+            self.G.add_edges_from([(
+                e[0],
+                e[1],
+                {'weight': obj.structure.get_edge_length(e),
+                'in_surf': in_surf[e]})
+                for e in core_edges])
 
         # We'll need to keep track of atom ids.
         for node_id in self.G.nodes:
             self.G.nodes[node_id]["full_id"] = obj.structure.point_ids[node_id]
+
+        if params.get("surface_only", False):
+            # Remove interior points
+            nodes_to_remove = []
+            for idx, adj_dict in self.G.adjacency():
+                if len(adj_dict) == 0:
+                    nodes_to_remove.append(idx)
+            for idx in nodes_to_remove:
+                self.G.remove_node(idx)
 
         return self.G
 

@@ -3,6 +3,7 @@ import warnings
 import numpy as np
 import pandas as pd
 import Bio
+import Bio.SeqIO
 from Bio import pairwise2
 from Bio.PDB import PDBParser
 from biograph.structure import StructureModel
@@ -48,18 +49,24 @@ class Protein:
         """Tries to load the sequences from the PDB file if present.
         It is also possible to use a PPBuilder for this, but sometimes
         it breaks up a sequence into smaller parts and they stop
-        matching with the FASTA files."""
+        matching with the FASTA files.
+        Returns a dictionary of the form chain_id => sequence"""
         if self._seq is not None:
             return self._seq
 
         if self.pdb_file is None:
             return None
 
-        import Bio.SeqIO
-        self._seq = []
+        self._seq = {}
         with open(self.pdb_file, "rU") as handle:
             for record in Bio.SeqIO.parse(handle, "pdb-seqres"):
-                self._seq.append(record.seq)
+                # record.name often is <unknown value>, but ID is not
+                # so we define the name as pdb id + chain id
+                chain_id = record.id #sometimes it's "A" (3RRF) sometimes it's "109T:A"
+                if ":" in chain_id:
+                    chain_id = chain_id.split(":")[1]
+                name = "{}_{}".format(self.pdb.id, chain_id)
+                self._seq.update({name:record.seq})
 
         return self._seq
 

@@ -320,18 +320,28 @@ class StaticContactGraphGenerator(GraphModel):
 
         return self.G
 
-    def add_features(self, dataframe, columns = ["bfactor", "score", "color",
+    def add_features(self, dataframe, agg = dict(), columns = [
+            "bfactor", "score", "color",
             "color_confidence_interval_high", "color_confidence_interval_low",
             "score_confidence_interval_high", "score_confidence_interval_low"]):
         """
         Add features to the static contact graph based on a dataframe.
         Dataframe must have res_full_id with standard Bio.PDB format
         and resname with three-letter aminoacid code.
+        Since each node in the graph represents a residue, rows that match
+        the residue full id are grouped and mean() aggregated to insert the
+        values in the graph node. For object types, selects the first element.
+        You can change this behavior by using the `agg` parameter.
 
         Parameters
         ----------
         dataframe : pd.DataFrame
             Dataframe to get features from.
+        agg : dict
+            Dictionary mapping column names to functions or function names
+            (see pandas.DataFrame.aggregate for more info.)
+            By default 'mean' for numeric types and first-element for
+            object types.
         columns : list
             Columns to be included. Must be numeric. If many values
             are repeated for the same residue (e.g. if the dataframe
@@ -341,7 +351,15 @@ class StaticContactGraphGenerator(GraphModel):
         -------
         nx.Graph
         """
-        features = dataframe.groupby(["res_full_id", "resname"]).mean().reset_index()
+        # By default behavior is 'mean' for numeric datatypes and 'first element'
+        # for all others (objects etc.)
+        aggfn = {
+            col: "mean" if pd.api.types.is_numeric_dtype(dtype) else lambda L: L[0]
+            for col, dtype in dataframe.dtypes.to_dict().items()
+            if col in columns
+        }
+        aggfn.update(agg)
+        features = dataframe.groupby(["res_full_id", "resname"]).agg(aggfn).reset_index()
         columns = [col for col in columns if col in features.columns]
 
         count_missing = 0

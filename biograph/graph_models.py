@@ -6,6 +6,7 @@ from getcontacts.contact_calc import transformations
 from getcontacts.Applications.contact_network_analysis import create_graph
 import tempfile
 import sys
+import os
 
 from biograph.constants import valid_amino_3
 
@@ -283,7 +284,7 @@ class StaticContactGraphGenerator(GraphModel):
         else:
             tempdir = tempfile.TemporaryDirectory()
             contacts_filename = "{}/{}_contacts.tsv".format(tempdir.name,
-                pdb_file.replace(".pdb", ""))
+                os.path.split(pdb_file.replace(".pdb", ""))[1])
 
         # The library also manipulates the stdout file descriptors, which
         # triggers unsupported behavior in iPython-like environments (e.g.
@@ -301,6 +302,7 @@ class StaticContactGraphGenerator(GraphModel):
             params["sele1"], params["sele2"])
 
         # Give back the stdout.
+        sys.stdout.close()
         sys.stdout= _stdout
         lines = []
         with open(contacts_filename, "r") as handle:

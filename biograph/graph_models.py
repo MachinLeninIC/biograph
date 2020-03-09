@@ -356,7 +356,7 @@ class StaticContactGraphGenerator(GraphModel):
         # By default behavior is 'mean' for numeric datatypes and 'first element'
         # for all others (objects etc.)
         aggfn = {
-            col: "mean" if pd.api.types.is_numeric_dtype(dtype) else lambda L: L[0]
+            col: "mean" if pd.api.types.is_numeric_dtype(dtype) else lambda L: L.iloc[0]
             for col, dtype in dataframe.dtypes.to_dict().items()
             if col in columns
         }

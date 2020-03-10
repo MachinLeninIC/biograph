@@ -6,6 +6,7 @@ from getcontacts.contact_calc import transformations
 from getcontacts.Applications.contact_network_analysis import create_graph
 import tempfile
 import sys
+import os
 
 from biograph.constants import valid_amino_3
 
@@ -263,7 +264,9 @@ class StaticContactGraphGenerator(GraphModel):
         argument or you prove a 'pdb_file' in params.
         params: parameters for the model, including geometry criteria. It has
         sensible defaults. You can view the full list of parameters in the
-        getcontact package.
+        getcontact package. Particularly, specify `save_contact_filename` if you
+        want to persist the results of the trajectories for later runs, since
+        the simulations are not run again if the file already exists.
 
         Returns
         -------
@@ -283,25 +286,39 @@ class StaticContactGraphGenerator(GraphModel):
         else:
             tempdir = tempfile.TemporaryDirectory()
             contacts_filename = "{}/{}_contacts.tsv".format(tempdir.name,
-                pdb_file.replace(".pdb", ""))
+                os.path.split(pdb_file.replace(".pdb", ""))[1])
 
-        # The library also manipulates the stdout file descriptors, which
-        # triggers unsupported behavior in iPython-like environments (e.g.
-        # Jupyter). Therefore we need to mask it for a bit.
-        _stdout = sys.stdout
-        sys.stdout = tempfile.TemporaryFile(mode="w+")
-        # If instead of the trajectory you pass it the topology again, then
-        # it calculates static contacts.
-        # Since we are not using trajectories, cores is always 1, beg and end
-        # are 0, and stride is 1.
-        compute_contacts(pdb_file, pdb_file, contacts_filename,
-            params["itypes"], params["geom_criteria"],
-            1, 0, 0, 1,
-            params["distout"], params["ligand"], params["solv"], params["lipid"],
-            params["sele1"], params["sele2"])
-
-        # Give back the stdout.
-        sys.stdout= _stdout
+        # Give the user the option of using a previous run.
+        if not os.path.isfile(contacts_filename):
+            # The library also manipulates the stdout file descriptors, which
+            # triggers unsupported behavior in iPython-like environments (e.g.
+            # Jupyter). Therefore we need to mask it for a bit.
+            with tempfile.TemporaryFile(mode="w+") as tempstdout:
+                real_stdout = sys.stdout
+                sys.stdout = tempstdout
+                # ADDITIONALLY, vmd-python leaks file descriptors!
+                # compute_contacts calls gen_index_to_atom which calls
+                # load_traj, and load_traj uses vmd.molecule.read..
+                # you can check with lsof that there are file descriptors
+                # that don't get cleaned up and they are related to stdout.
+                # So, if graph_models.StaticContactGraphGenerator is run in
+                # a script with >100 proteins to process, the script will fail
+                # because of too many open FDs.
+                import multiprocessing
+                def job():
+                    # If instead of the trajectory you pass it the topology again, then
+                    # it calculates static contacts.
+                    # Since we are not using trajectories, cores is always 1, beg and end
+                    # are 0, and stride is 1.
+                    compute_contacts(pdb_file, pdb_file, contacts_filename,
+                        params["itypes"], params["geom_criteria"],
+                        1, 0, 0, 1,
+                        params["distout"], params["ligand"], params["solv"], params["lipid"],
+                        params["sele1"], params["sele2"])
+                p = multiprocessing.Process(target=job)
+                p.start()
+                p.join()
+                sys.stdout = real_stdout
         lines = []
         with open(contacts_filename, "r") as handle:
             line = handle.readline()
@@ -320,18 +337,30 @@ class StaticContactGraphGenerator(GraphModel):
 
         return self.G
 
-    def add_features(self, dataframe, columns = ["bfactor", "score", "color",
+    def add_features(self, dataframe, agg = dict(), unk_valid = True, columns = [
+            "bfactor", "score", "color",
             "color_confidence_interval_high", "color_confidence_interval_low",
             "score_confidence_interval_high", "score_confidence_interval_low"]):
         """
         Add features to the static contact graph based on a dataframe.
         Dataframe must have res_full_id with standard Bio.PDB format
         and resname with three-letter aminoacid code.
+        Since each node in the graph represents a residue, rows that match
+        the residue full id are grouped and mean() aggregated to insert the
+        values in the graph node. For object types, selects the first element.
+        You can change this behavior by using the `agg` parameter.
 
         Parameters
         ----------
         dataframe : pd.DataFrame
             Dataframe to get features from.
+        agg : dict
+            Dictionary mapping column names to functions or function names
+            (see pandas.DataFrame.aggregate for more info.)
+            By default 'mean' for numeric types and first-element for
+            object types.
+        unk_valid: bool
+            Whether to include UNK atoms or not.
         columns : list
             Columns to be included. Must be numeric. If many values
             are repeated for the same residue (e.g. if the dataframe
@@ -341,7 +370,15 @@ class StaticContactGraphGenerator(GraphModel):
         -------
         nx.Graph
         """
-        features = dataframe.groupby(["res_full_id", "resname"]).mean().reset_index()
+        # By default behavior is 'mean' for numeric datatypes and 'first element'
+        # for all others (objects etc.)
+        aggfn = {
+            col: "mean" if pd.api.types.is_numeric_dtype(dtype) else lambda L: L.iloc[0]
+            for col, dtype in dataframe.dtypes.to_dict().items()
+            if col in columns
+        }
+        aggfn.update(agg)
+        features = dataframe.groupby(["res_full_id", "resname"]).agg(aggfn).reset_index()
         columns = [col for col in columns if col in features.columns]
 
         count_missing = 0
@@ -349,7 +386,7 @@ class StaticContactGraphGenerator(GraphModel):
         for index, row in features.iterrows():
             # Sometimes there are water molecules or things that are not aminoacids
             # in the dataframe.
-            if not valid_amino_3(row["resname"]):
+            if not valid_amino_3(row["resname"], unk_valid=True):
                 continue
 
             #res_full_id has format (pdb_name, 0, chain, (atom, residue_inumber, t))

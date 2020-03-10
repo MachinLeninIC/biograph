@@ -264,7 +264,9 @@ class StaticContactGraphGenerator(GraphModel):
         argument or you prove a 'pdb_file' in params.
         params: parameters for the model, including geometry criteria. It has
         sensible defaults. You can view the full list of parameters in the
-        getcontact package.
+        getcontact package. Particularly, specify `save_contact_filename` if you
+        want to persist the results of the trajectories for later runs, since
+        the simulations are not run again if the file already exists.
 
         Returns
         -------
@@ -286,24 +288,37 @@ class StaticContactGraphGenerator(GraphModel):
             contacts_filename = "{}/{}_contacts.tsv".format(tempdir.name,
                 os.path.split(pdb_file.replace(".pdb", ""))[1])
 
-        # The library also manipulates the stdout file descriptors, which
-        # triggers unsupported behavior in iPython-like environments (e.g.
-        # Jupyter). Therefore we need to mask it for a bit.
-        _stdout = sys.stdout
-        sys.stdout = tempfile.TemporaryFile(mode="w+")
-        # If instead of the trajectory you pass it the topology again, then
-        # it calculates static contacts.
-        # Since we are not using trajectories, cores is always 1, beg and end
-        # are 0, and stride is 1.
-        compute_contacts(pdb_file, pdb_file, contacts_filename,
-            params["itypes"], params["geom_criteria"],
-            1, 0, 0, 1,
-            params["distout"], params["ligand"], params["solv"], params["lipid"],
-            params["sele1"], params["sele2"])
-
-        # Give back the stdout.
-        sys.stdout.close()
-        sys.stdout= _stdout
+        # Give the user the option of using a previous run.
+        if not os.path.isfile(contacts_filename):
+            # The library also manipulates the stdout file descriptors, which
+            # triggers unsupported behavior in iPython-like environments (e.g.
+            # Jupyter). Therefore we need to mask it for a bit.
+            with tempfile.TemporaryFile(mode="w+") as tempstdout:
+                real_stdout = sys.stdout
+                sys.stdout = tempstdout
+                # ADDITIONALLY, vmd-python leaks file descriptors!
+                # compute_contacts calls gen_index_to_atom which calls
+                # load_traj, and load_traj uses vmd.molecule.read..
+                # you can check with lsof that there are file descriptors
+                # that don't get cleaned up and they are related to stdout.
+                # So, if graph_models.StaticContactGraphGenerator is run in
+                # a script with >100 proteins to process, the script will fail
+                # because of too many open FDs.
+                import multiprocessing
+                def job():
+                    # If instead of the trajectory you pass it the topology again, then
+                    # it calculates static contacts.
+                    # Since we are not using trajectories, cores is always 1, beg and end
+                    # are 0, and stride is 1.
+                    compute_contacts(pdb_file, pdb_file, contacts_filename,
+                        params["itypes"], params["geom_criteria"],
+                        1, 0, 0, 1,
+                        params["distout"], params["ligand"], params["solv"], params["lipid"],
+                        params["sele1"], params["sele2"])
+                p = multiprocessing.Process(target=job)
+                p.start()
+                p.join()
+                sys.stdout = real_stdout
         lines = []
         with open(contacts_filename, "r") as handle:
             line = handle.readline()

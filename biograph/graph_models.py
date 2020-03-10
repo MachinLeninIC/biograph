@@ -337,7 +337,7 @@ class StaticContactGraphGenerator(GraphModel):
 
         return self.G
 
-    def add_features(self, dataframe, agg = dict(), columns = [
+    def add_features(self, dataframe, agg = dict(), unk_valid = True, columns = [
             "bfactor", "score", "color",
             "color_confidence_interval_high", "color_confidence_interval_low",
             "score_confidence_interval_high", "score_confidence_interval_low"]):
@@ -359,6 +359,8 @@ class StaticContactGraphGenerator(GraphModel):
             (see pandas.DataFrame.aggregate for more info.)
             By default 'mean' for numeric types and first-element for
             object types.
+        unk_valid: bool
+            Whether to include UNK atoms or not.
         columns : list
             Columns to be included. Must be numeric. If many values
             are repeated for the same residue (e.g. if the dataframe
@@ -384,7 +386,7 @@ class StaticContactGraphGenerator(GraphModel):
         for index, row in features.iterrows():
             # Sometimes there are water molecules or things that are not aminoacids
             # in the dataframe.
-            if not valid_amino_3(row["resname"]):
+            if not valid_amino_3(row["resname"], unk_valid=True):
                 continue
 
             #res_full_id has format (pdb_name, 0, chain, (atom, residue_inumber, t))

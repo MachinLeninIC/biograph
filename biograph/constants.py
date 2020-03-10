@@ -37,7 +37,7 @@ SIDECHAIN = {'ALA': 'CA', 'ARG': 'CA NE', 'ASN': 'CA OD1', 'ASP': 'CA OD1', 'CYS
 AMINOACIDS_3 = ['ALA', 'ARG', 'ASN', 'ASP', 'CYS', 'GLN', 'GLU', 'GLY', 'HIS', 'ILE', 'LEU', 'LYS', 'MET', 'PHE',
               'PRO', 'SER', 'THR', 'TRP', 'TYR', 'VAL']
 
-AMINOACIDS_3_TO_1 = { 
+AMINOACIDS_3_TO_1 = {
     'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E',
     'PHE': 'F', 'GLY': 'G', 'HIS': 'H', 'ILE': 'I',
     'LYS': 'K', 'LEU': 'L', 'MET': 'M', 'ASN': 'N',
@@ -72,7 +72,7 @@ def amino_1code(amino_3code):
 def valid_amino_1(amino_1_code):
     return amino_1_code in AMINOACIDS_3_TO_1.keys()
 
-def valid_amino_3(amino_3_code):
-    return amino_3_code in AMINOACIDS_3
+def valid_amino_3(amino_3_code, unk_valid = False):
+    return amino_3_code in AMINOACIDS_3 or (unk_valid and amino_3_code == "UNK")
 
-    
+

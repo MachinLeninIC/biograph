@@ -253,6 +253,7 @@ class StaticContactGraphGenerator(GraphModel):
         params.setdefault("sele1", "protein")
         params.setdefault("sele2", params["sele1"])
         params.setdefault("save_contact_filename", None)
+        params.setdefault("verbosity", 1)
         return params
 
     def generate_graph(self, protein, params):
@@ -261,12 +262,13 @@ class StaticContactGraphGenerator(GraphModel):
         Parameters
         ----------
         protein: the Protein object. Either it was created with a file name as
-        argument or you prove a 'pdb_file' in params.
+            argument or you prove a 'pdb_file' in params.
         params: parameters for the model, including geometry criteria. It has
-        sensible defaults. You can view the full list of parameters in the
-        getcontact package. Particularly, specify `save_contact_filename` if you
-        want to persist the results of the trajectories for later runs, since
-        the simulations are not run again if the file already exists.
+            sensible defaults. You can view the full list of parameters in the
+            getcontact package. Particularly, specify `save_contact_filename` if you
+            want to persist the results of the trajectories for later runs, since
+            the simulations are not run again if the file already exists. `verbosity`
+            is the verbosity level (higher is more explicit, 0 is nothing at all)
 
         Returns
         -------
@@ -310,16 +312,25 @@ class StaticContactGraphGenerator(GraphModel):
                     # it calculates static contacts.
                     # Since we are not using trajectories, cores is always 1, beg and end
                     # are 0, and stride is 1.
-                    compute_contacts(pdb_file, pdb_file, contacts_filename,
-                        params["itypes"], params["geom_criteria"],
-                        1, 0, 0, 1,
-                        params["distout"], params["ligand"], params["solv"], params["lipid"],
-                        params["sele1"], params["sele2"])
+                    try:
+                        compute_contacts(pdb_file, pdb_file, contacts_filename,
+                            params["itypes"], params["geom_criteria"],
+                            1, 0, 0, 1,
+                            params["distout"], params["ligand"], params["solv"], params["lipid"],
+                            params["sele1"], params["sele2"])
+                    except Exception as e:
+                        if params["verbosity"] > 0:
+                            raise e
                 p = multiprocessing.Process(target=job)
                 p.start()
                 p.join()
                 sys.stdout = real_stdout
         lines = []
+        # Since we're running compute_contacts in another process,
+        # we are discarding its exceptions:
+        if not os.path.isfile(contacts_filename):
+            raise Exception("Compute contacts failed")
+
         with open(contacts_filename, "r") as handle:
             line = handle.readline()
             while line:
@@ -340,7 +351,8 @@ class StaticContactGraphGenerator(GraphModel):
     def add_features(self, dataframe, agg = dict(), unk_valid = True, columns = [
             "bfactor", "score", "color",
             "color_confidence_interval_high", "color_confidence_interval_low",
-            "score_confidence_interval_high", "score_confidence_interval_low"]):
+            "score_confidence_interval_high", "score_confidence_interval_low"],
+            verbosity = 1):
         """
         Add features to the static contact graph based on a dataframe.
         Dataframe must have res_full_id with standard Bio.PDB format
@@ -365,6 +377,9 @@ class StaticContactGraphGenerator(GraphModel):
             Columns to be included. Must be numeric. If many values
             are repeated for the same residue (e.g. if the dataframe
             is at the atom level), they are averaged.
+        verbosity: int (default 1)
+            Level of verbosity. The higher, the more verbose. Set 0 for
+            none at all.
 
         Returns
         -------
@@ -394,13 +409,15 @@ class StaticContactGraphGenerator(GraphModel):
             res_id = "{}:{}:{}".format(row["res_full_id"][2], row["resname"], row["res_full_id"][3][1])
 
             if res_id not in self.G.nodes:
-                print("Missing node here: {} - {} aka {}".format(
-                    row["res_full_id"], row["resname"], res_id))
+                if verbosity > 0:
+                    print("Missing node here: {} - {} aka {}".format(
+                        row["res_full_id"], row["resname"], res_id))
                 count_missing+=1
                 continue
 
             for col in columns:
                 self.G.nodes[res_id][col] = row[col]
 
-        print("Missing nodes: {}".format(count_missing))
+        if verbosity > 0:
+            print("Missing nodes: {}".format(count_missing))
         return self.G

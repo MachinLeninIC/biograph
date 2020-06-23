@@ -24,7 +24,8 @@ class GraphModel:
     @staticmethod
     def get_diffused_graph(G, aggregator = None, keys = None, steps = 1):
         """Diffuses some `keys` features across graph neighbors that are
-        `steps` apart and afterwards process the groups using `aggregator`.
+        up to `steps` apart and afterwards processes the groups using
+        `aggregator`.
         Diffused features end with "_n" with n being the steps to the node.
 
         Parameters
@@ -56,11 +57,11 @@ class GraphModel:
                 for dist in range(1, steps+1):
                     diffused_graph.nodes[node_idx]["{}_{}".format(key, dist)] = list()
 
+        new_keys = set()
         for node_idx in G.nodes:
             # nx doesn't offer a bfs traversal that also yields distances,
             # so we need to keep track of them.
             distances = {node_idx: 0}
-            new_keys = set()
             for origin, neighbor in nx.bfs_edges(G, node_idx):
                 distances[neighbor] = distances[origin] + 1
                 if distances[neighbor] > steps:
@@ -90,7 +91,7 @@ class GraphModel:
                 # Basic aggregator. If the type is numeric-like then do a mean, otherwise
                 # discard it.
                 diffused_features = {k:v for k,v in diffused_features.items()
-                    if isinstance(v[0], (int, float, complex))}
+                    if len(v)>0 and isinstance(v[0], (int, float, complex))}
                 for diffused_key in diffused_features.keys():
                     feature_list = diffused_features[diffused_key]
                     diffused_features[diffused_key] = sum(feature_list)/len(feature_list)
@@ -393,7 +394,7 @@ class StaticContactGraphGenerator(GraphModel):
             if col in columns
         }
         aggfn.update(agg)
-        features = dataframe.groupby(["res_full_id", "resname"]).agg(aggfn).reset_index()
+        features = dataframe.groupby(["res_full_id"]).agg(aggfn).reset_index()
         columns = [col for col in columns if col in features.columns]
 
         count_missing = 0

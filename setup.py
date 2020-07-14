@@ -74,6 +74,7 @@ setup(
     description="Represent proteins as graphs for machine learning",
     author="Joaquin Torre Zaffaroni, Leandro Lombardi, Leonardo Cordoba",
     author_email="joaquintorrezaffaroni@gmail.com",
+    scripts=["scripts/biograph_pymol_path"],
     packages=["biograph", "getcontacts", "getcontacts.contact_calc", "getcontacts.Applications"],
     package_data={
         "biograph": [

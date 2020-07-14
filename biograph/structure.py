@@ -278,7 +278,7 @@ class StructureModel:
 
         persistent_homology = PersistentHomology(self.delaunay.simplices[self.simplices_order])
 
-        step = PersistentHomology.get_step_for_topology(
+        step = persistent_homology.get_step_for_topology(
             min_step=self._get_min_steps(self.simplices_order),
             betti_numbers=topology
         )
@@ -362,7 +362,7 @@ class StructureModel:
 class PersistentHomology:
     """Class that for a given filtration finds the cut to match a target
     topology."""
-    def __init__(self, simplices)
+    def __init__(self, simplices):
         self.simplices = simplices
 
     def get_step_for_topology(self, min_step=0, betti_numbers=[1, 0, 0]):
@@ -394,9 +394,10 @@ class PersistentHomology:
         simplex_tree = gudhi.SimplexTree()
         for i, tetrahedron in enumerate(self.simplices):
             simplex_tree.insert(tetrahedron, i)
-            if i >= min_step:
-                simplex_tree.compute_persistence()
-                if simplex_tree.betti_numbers() == betti_numbers:
-                    return i
+
+        simplex_tree.compute_persistence()
+        for birth in range(min_step, self.simplices.shape[0]):
+            if simplex_tree.persistent_betti_numbers(birth, birth + 1) == betti_numbers:
+                return birth
 
         raise ValueError("Desired topology could not be reached.")

@@ -53,3 +53,30 @@ building first with the `ignore-vmd` flag:
 Example notebooks are provided in `examples/`. The most
 straightforward machine learning example is in
 `examples/ExamplePipeline.ipynb`.
+
+
+### PyMol
+
+Installing the package also installes a script called `biograph_pymol_path`.
+Running it provides output similar to the following:
+
+```
+$ biograph_pymol_path 
+Run BioGraph on PyMol using the following command in the PyMol console:
+run /usr/local/lib/python3.6/dist-packages/biograph/pymol.py
+```
+
+In a PyMol session, running that command will give you a new command named 
+`delaunay`. After fetching a protein, you can run `delaunay PDB_id` to view 
+the surface of the complex which would be used to generate the structure graph.
+
+As an example, take the following PyMol session history:
+
+```
+run /usr/local/lib/python3.6/dist-packages/biograph/pymol.py
+fetch 4STD
+delaunay 4STD
+```
+
+again, take into account that the path may be different.
+

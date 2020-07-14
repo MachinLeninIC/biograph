@@ -30,7 +30,7 @@ class StandardDownloader:
         files_in_bp = (f for f in os.listdir(self.base_path)
             if os.path.isfile(os.path.join(self.base_path, f)))
 
-        self.downloaded_files = {fn.split(".")[0].strip().lower() : os.path.join(self.base_path, fn)
+        self.downloaded_files = {fn.lower() : os.path.join(self.base_path, fn)
             for fn in files_in_bp}
 
     def do_make_request(self, id, timeout = 5.0):
@@ -87,9 +87,9 @@ class StandardDownloader:
         files_list = []
         for id in self.ids_list:
             urlid = id.replace("/", "_")
-            if urlid.lower() in self.downloaded_files.keys() and not self.force_download:
+            if f"{urlid.lower()}.pdb" in self.downloaded_files.keys() and not self.force_download:
                 print("Previously downloaded id:", id)
-                files_list.append(self.downloaded_files[urlid.lower()])
+                files_list.append(self.downloaded_files[f"{urlid.lower()}.pdb"])
                 continue
 
             file_ext, file_text = self.do_make_request(urlid, **kwargs)
@@ -138,6 +138,10 @@ class PdbDownloader(StandardDownloader):
         self.pdb = pdb_url
         self.pdb_redo = pdb_redo_url
         self.url_to_complete = None
+        self.downloaded_files = {
+            k:v for k, v in self.downloaded_files.items()
+                if k[-4:] == ".pdb"
+        }
 
     def do_make_request(self, id, try_redo = True):
         """

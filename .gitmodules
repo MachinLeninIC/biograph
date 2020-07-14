@@ -1,0 +1,9 @@
+[submodule "biograph/cdhit"]
+	path = biograph/cdhit
+	url = https://github.com/weizhongli/cdhit.git
+[submodule "getcontacts"]
+	path = getcontacts
+	url = https://github.com/getcontacts/getcontacts.git
+[submodule "vmd-python"]
+	path = vmd-python
+	url = https://github.com/Eigenstate/vmd-python

@@ -89,9 +89,6 @@ __pycache__/
 *.txt
 *.swp
 output*
-vmd-python
-getcontacts
-cdhit
 build
 MANIFEST.in
 *.ipynb_checkpoints/

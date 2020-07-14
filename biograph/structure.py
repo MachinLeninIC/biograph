@@ -8,6 +8,7 @@ from biograph.io import Writer
 import biograph
 import matplotlib.pyplot as plt
 import pandas as pd
+import gudhi
 from mpl_toolkits import mplot3d
 
 
@@ -267,6 +268,25 @@ class StructureModel:
         # TODO: check
         return max(self.edge_size(self.delaunay.simplices[self.simplices_order[i]]))
 
+    def get_step_for_topology(self, topology=[1, 0, 0], recalculate=False):
+        """Get step of the filtration to match the desired topology while
+        having all the points. Result is cached for performance, though
+        it can be recalculated with recalculate=True.
+        """
+        if str(topology) in self.persistent_hom_params and not recalculate:
+            return self.persistent_hom_params[str(topology)]
+
+        persistent_homology = PersistentHomology(self.delaunay.simplices[self.simplices_order])
+
+        step = persistent_homology.get_step_for_topology(
+            min_step=self._get_min_steps(self.simplices_order),
+            betti_numbers=topology
+        )
+
+        self.persistent_hom_params[str(topology)] = step
+        return step
+
+
     @staticmethod
     def get_faces(simplices):
         """From a K dim array of n-simplices gets a cube of facesself. That is,
@@ -330,26 +350,8 @@ class StructureModel:
         -------
         None
         """
-        if view_position == 0:
-            None
-        elif view_position == 1:
-            view_init_elev, view_init_azim = 35, 0
-        elif view_position == 2:
-            view_init_elev, view_init_azim = 35, 45
-        elif view_position == 3:
-            view_init_elev, view_init_azim = 35, 90
-        elif view_position == 4:
-            view_init_elev, view_init_azim = 35, 135
-        elif view_position == 5:
-            view_init_elev, view_init_azim = 35, 180
-        elif view_position == 6:
-            view_init_elev, view_init_azim = 35, 225
-        elif view_position == 7:
-            view_init_elev, view_init_azim = 35, 270
-        elif view_position == 8:
-            view_init_elev, view_init_azim = 35, 315
-        else:
-            raise Exception("View not implemented")
+        view_init_elev, view_init_azim = 35, view_position * 45
+
         triangles = self.get_simplices_by_step(step)
         ax = plt.axes(projection='3d')
         ax.view_init(view_init_elev, view_init_azim)
@@ -357,163 +359,45 @@ class StructureModel:
                         self.points[:, 2], triangles=triangles, cmap=cmap)
 
 
-class Perseus:
-    """ Class that wraps the usage of Perseus command line interface. With
-    Perseus a persistent homology-based approach is used to model the surface
-    and core of proteins. In addition, this can be used to model de depth of
-    a given residue in the protein.
-    """
+class PersistentHomology:
+    """Class that for a given filtration finds the cut to match a target
+    topology."""
+    def __init__(self, simplices):
+        self.simplices = simplices
 
-    def __init__(self):
-        MODULEDIR = os.path.dirname(os.path.abspath(__file__))
-        self.__perseuspath = os.path.join(MODULEDIR, "perseus", "perseus")
-
-    def execute_persistent_hom(self, structure, topology=(1, 0, 0),
-                               perseus_input_filename="ordered_simplices.pers",
-                               output_dir="perseus", output_filename="pdb"):
+    def get_step_for_topology(self, min_step=0, betti_numbers=[1, 0, 0]):
         """
-        Function used to execute persistent homology. This function uses Perseus's
-        simtop method.
-        Perseus's documentation can be found in:
-        http://people.maths.ox.ac.uk/nanda/perseus/index.html
-
+        Using gudhi, obtain the minimum step of the filtration that matches
+        the topology that is higher than `min_step`.
         Parameters
         ----------
-        topology : tuple or list
-            topology is used to define different steps of interest.
-            First element, is the first betti number (b0), is the number of
-            connected components.
-            Second element, is the second betti number (b1), is the number of
-            holes.
-            Third element, is the third betti number (b2), is the number of
-            cavities.
-            At each step of the simplicial tessellation bettin numbers are
-            computed, using Perseus. This parameter regulates when to save
+        min_step: int
+            Default 0. The minimum step to use. It is recommended to use
+            the minimum step in which all the desired nodes are in the
+            simplicial complex.
+
+        betti_numbers: list of int
+            List like (b0, b1, b2) where:
+            b0 is the first betti number, the number of connected components.
+            b1 is the second betti number, is the number of holes.
+            b2 is the third betti number, is the number of cavities.
+
+            At each step of the simplicial tessellation betti numbers are
+            computed using Gudhi. This parameter regulates when to save
             steps of interest.
-            For example, if b0 is 1, then when there is a connected component
-
-        output_dir : str
-            directory where output will be written
-        output_filename : str
-            name for output file
+            For example, if b0 is 1, then when there is a single connected
+            component.
 
         Returns
         -------
-        StructureModel
-            StructureModel with persistent_hom_params computed
-            StructureModel.persistent_hom_params is a dict with the following
-            steps computed:
-            b0_step: step at which all points in the structure are covered by
-            the simplices.
-            b1_step: when all points in the structure are covered by the
-            simplices and topology[0] condition is met.
-            Typically, it might be of interest the step at which there is only
-            one connected component.
-            b2_step: when all points in the structure are covered by the
-            simplices and topology[0] and topology[1] conditions are met.
-            For example, you might be interested in knowing when there is only
-            one connected component and no holes.
-            b3_step: when all points in the structure are covered by the
-            simplices and topology[0] and topology[1] and topology[2] conditions
-            are met.
-            It may be the case that you are interested in knowing when there
-            is only one connected component, no holes and no cavities."""
-        structure_ = structure
-        if isinstance(structure_, biograph.protein.Protein):
-            structure = structure.structure
-
-        # TODO: validar que structure tenga datos
-        # TODO: validar que sea Protein
-
-        dir_path = os.path.join(output_dir, output_filename)
-        Writer(dir_path).create_directory()
-
-        with open(os.path.join(dir_path, perseus_input_filename),
-                  'w') as ofile:
-            # These are the dimensions of the array passed to perseus
-            ofile.write('3\n1\n')
-            input = np.append(
-                structure.delaunay.simplices[structure.simplices_order],
-                np.arange(1, 1 + structure.delaunay.nsimplex).reshape(-1, 1),
-                axis=1)
-            np.savetxt(ofile, input, delimiter=' ', newline='\n', fmt='%i')
-        b0_step = structure._get_min_steps(order=structure.simplices_order)
-        to_run = (self.__perseuspath, 'simtop',
-                  os.path.join(dir_path, perseus_input_filename),
-                  os.path.join(dir_path, "perseus_output"))
-        popen = subprocess.Popen(to_run, stdout=subprocess.PIPE)
-        popen.wait()
-        with open(os.path.join(output_dir, output_filename,
-                               'perseus_output_betti.txt'), 'r') as ifile:
-            b1_step = b0_step
-            b2_step = b0_step
-            b3_step = b0_step
-            for line in ifile.readlines()[1:]:
-                # first line is blank
-                try:
-                    i, h0, h1, h2, _ = [int(x) for x in line.split()]
-                except ValueError:
-                    i, h0, h1, h2 = [int(x) for x in line.split()]
-
-                if i >= b0_step and h0 == topology[0]:
-
-                    # only modifies b0_step once
-                    if b1_step == b0_step:
-                        b1_step = i
-
-                    # only modifies the b2_step online once
-                    if b2_step == b0_step and h1 == topology[1]:
-                        b2_step = i
-                    # save b3_step and break
-                    if h1 == topology[1] and h2 == topology[2]:
-                        b3_step = i
-                        break
-
-        if isinstance(structure_, biograph.protein.Protein):
-            structure_.structure.persistent_hom_params["b0_step"] = b0_step
-            structure_.structure.persistent_hom_params["b1_step"] = b1_step
-            structure_.structure.persistent_hom_params["b2_step"] = b2_step
-            structure_.structure.persistent_hom_params["b3_step"] = b3_step
-        else:
-            structure_.persistent_hom_params["b0_step"] = b0_step
-            structure_.persistent_hom_params["b1_step"] = b1_step
-            structure_.persistent_hom_params["b2_step"] = b2_step
-            structure_.persistent_hom_params["b3_step"] = b3_step
-        return structure_
-
-    @staticmethod
-    def read_betti(betti_filename, step):
-        """Read a betti file, the output of Perseus. If you had run Perseus
-        before you can just read that result, instead of running the process
-        again.
-
-        Parameters
-        ----------
-        betti_filename : str
-            full path to betti file
-        step : int
-            step until which read the file
-
-        Returns
-        -------
-        pandas DataFrame
-            Output of Perseus' simtop. For example, a line in the file can be
-            12 14 4 7 0
-            which indicates that when all the cells with birth time less than
-            or equal to 12 are included, then there are 14 connected components
-            4 tunnels, 7 cavities and no higher dimensional generators of
-            homology. The numbers 14, 4 and 7 in this context are called the
-            zeroth, first and second Betti numbers of the 12-th subcomplex in
-            the persistence filtration.
         """
-        ifile = open(betti_filename)
-        betti = [list(map(int, x.split())) for x in ifile.readlines() if
-                 x.split()]
-        ifile.close()
-        betti = [x for x in betti if int(x[0]) <= step]
-        betti = pd.DataFrame(betti, columns=["birth_time",
-                                             "0th_dim(connected_components)",
-                                             "1th_dim(tunnels)",
-                                             "2th_dim(cavities)",
-                                             "3th_dim"])
-        return betti
+        simplex_tree = gudhi.SimplexTree()
+        for i, tetrahedron in enumerate(self.simplices):
+            simplex_tree.insert(tetrahedron, i)
+
+        simplex_tree.compute_persistence()
+        for birth in range(min_step, self.simplices.shape[0]):
+            if simplex_tree.persistent_betti_numbers(birth, birth + 1) == betti_numbers:
+                return birth
+
+        raise ValueError("Desired topology could not be reached.")

@@ -70,9 +70,9 @@ class BioGraphInstall(SetuptoolsInstall):
 
 setup(
     name="biograph",
-    version="0.1",
+    version="0.2",
     description="Represent proteins as graphs for machine learning",
-    author="Leonardo Cordoba, Leandro Lombardi, Sebastian Prillo, Joaquin Torre Zaffaroni",
+    author="Joaquin Torre Zaffaroni, Leandro Lombardi, Leonardo Cordoba",
     author_email="joaquintorrezaffaroni@gmail.com",
     packages=["biograph", "getcontacts", "getcontacts.contact_calc", "getcontacts.Applications"],
     package_data={
@@ -98,6 +98,7 @@ setup(
         "scikit-learn",
         "pytest",
         "seaborn",
-        "cython"
+        "cython",
+        "gudhi"
     ]
 )

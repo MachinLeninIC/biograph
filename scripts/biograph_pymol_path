@@ -1,0 +1,8 @@
+#!/usr/bin/env python3
+import os
+import biograph
+
+full_path = os.path.join(os.path.dirname(biograph.__file__), "pymol.py")
+
+print("Run BioGraph on PyMol using the following command in the PyMol console:")
+print("run {}".format(full_path))

@@ -1,9 +1,6 @@
 import networkx as nx
 import pandas as pd
 from itertools import combinations
-from getcontacts.contact_calc.compute_contacts import compute_contacts
-from getcontacts.contact_calc import transformations
-from getcontacts.Applications.contact_network_analysis import create_graph
 import tempfile
 import sys
 import os
@@ -276,6 +273,10 @@ class StaticContactGraphGenerator(GraphModel):
         graph: a networkx.Graph instance containing the full static contact graph
         for the given protein.
         """
+
+        from getcontacts.contact_calc.compute_contacts import compute_contacts
+        from getcontacts.contact_calc import transformations
+
         params = self._parse_params(params)
         pdb_file = protein.pdb_file
         pdb_file = pdb_file if "pdb_file" not in params else params["pdb_file"]

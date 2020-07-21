@@ -70,7 +70,7 @@ class BioGraphInstall(SetuptoolsInstall):
 
 setup(
     name="biograph",
-    version="0.2",
+    version="0.3",
     description="Represent proteins as graphs for machine learning",
     author="Joaquin Torre Zaffaroni, Leandro Lombardi, Leonardo Cordoba",
     author_email="joaquintorrezaffaroni@gmail.com",

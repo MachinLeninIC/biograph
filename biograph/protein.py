@@ -408,10 +408,62 @@ class Protein:
         """Discards rows from the dataframe that are not in the chainlist."""
         self.df = self.df[self.df.chain.isin(chain_list)]
 
+    def _filter_het_rows(self, allowed_ligands, discard_water, keep_normal_atoms):
+        """Provides a pandas filter to handle ligands, water and normal atoms"""
+        return lambda res: ((keep_normal_atoms and (res[3][0][0:2] not in ["H_", "W"]))
+                            or (res[3][0][0:2] == "H_" and res[3][0][2:] in allowed_ligands)
+                            or (res[3][0] == "W" and not discard_water))
+
+    def select_ligands(self, allowed_ligands, discard_water=True):
+        """Keep only heterogen atoms that are ligands in provided list.
+        `allowed_ligands` must be hetIDs or ligand IDs as found in the PDB,
+        e.g. ATP, BFS, GOL, etc.
+        `discard_water` controls whether to filter out water atoms.
+        """
+        if isinstance(allowed_ligands, str):
+            allowed_ligands = [allowed_ligands]
+
+        allowed_rows = self.df.res_full_id.apply(
+            self._filter_het_rows(allowed_ligands, discard_water, True))
+
+        self.df = self.df.loc[~allowed_rows]
+
+    def extract_ligands(self, allowed_ligands, remove_from_df=True):
+        """Extract and return ligand rows from dataframe, optionally
+        removing from the dataframe as well (`remove_from_df`)"""
+        if isinstance(allowed_ligands, str):
+            allowed_ligands = [allowed_ligands]
+
+        ligand_rows = self.df.res_full_id.apply(
+            self._filter_het_rows(allowed_ligands, True, False))
+
+        if remove_from_df:
+            self.df = self.df.loc[~ligand_rows]
+
+        return ligand_rows
+
     def discard_ligands(self):
         """Discards rows from the dataframe that correspond to ligands or
         heterogen atoms.
-        For more information read about the HET section in PDB files."""
+        For more information read about the HET section in PDB files:
+        https://www.wwpdb.org/documentation/file-format-content/format33/sect4.html"""
         het_rows = self.df.res_full_id.apply(
             lambda res: res[3][0] == "W" or res[3][0][0:2] == "H_")
         self.df = self.df.loc[~het_rows]
+
+    def discard_empty_coordinates(self):
+        """Discards rows from the dataframe with missing coordinates.
+        This is necessary when building structure models and the like.
+        More info on missing coords:
+        pdb101.rcsb.org/learn/guide-to-understanding-pdb-data/missing-coordinates-and-biological-assemblies"""
+        self.df = self.df.loc[~self.df.coord.isnull()]
+
+    def add_distance_to_target_feature(self, target_rows):
+        """Adds a `distance` feature to the dataframe which holds
+        the minimum distance of each atom to the atoms of target_rows.
+        This can be useful as a target for supervised learning."""
+        target_coords = target_rows.coord.to_list()
+
+        self.df["distance"] = self.df.coord.apply(
+            lambda atom: min(map(lambda target_atom: np.linalg.norm(atom-target_atom), target_coords))
+        )

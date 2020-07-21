@@ -11,6 +11,13 @@ import pandas as pd
 import gudhi
 from mpl_toolkits import mplot3d
 
+class CoarseGrainedFilters:
+    """A class to specify helper functions to filter rows of
+    the dataframe when creating a structure model"""
+    @staticmethod
+    def alpha_carbon_filter():
+        """Simplest filter that only keeps the alpha carbon for each aminoacid"""
+        return lambda row: row["full_id"][4][0] == "CA"
 
 class StructureModel:
     """StructureModel is a 3D representation of a protein. It has different

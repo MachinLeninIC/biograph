@@ -11,13 +11,17 @@ from biograph.downloader import PdbDownloader
 from biograph.constants import amino_1code, valid_amino_3, valid_amino_1
 from biograph import alignment
 
-# Bio often produces a couple of warnings when loading pdb files.
-# This can cloud logs when dealing with a large amount of pdbs.
-# We provide the option to suppress those warnings, and with
-# this module-level flag we make sure to only warn about it once.
-__warned_about_suppressing_bio = False
+
 
 class Protein:
+    """Main BioGraph class for representing proteins through dataframes.
+    Provides utilities for handling atoms, constructing structures or graphs
+    and target variables."""
+    # Bio often produces a couple of warnings when loading pdb files.
+    # This can cloud logs when dealing with a large amount of pdbs.
+    # We provide the option to suppress those warnings, and with
+    # this module-level flag we make sure to only warn about it once.
+    _warned_about_suppressing_bio = False
     @staticmethod
     def fetch(pdb_id, base_path=".", suppress_bio_warnings=True):
         """Fetch a PDB file and instantiate a Protein with it."""
@@ -83,9 +87,9 @@ class Protein:
             self.pdb_file = pdb
             with warnings.catch_warnings():
                 if self.suppress_bio_warnings:
-                    if not __warned_about_suppressing_bio:
+                    if not Protein._warned_about_suppressing_bio:
                         warnings.warn("suppress_bio_warnings=True, ignoring Bio's warnings.")
-                        __warned_about_suppressing_bio = True
+                        Protein._warned_about_suppressing_bio = True
                     warnings.simplefilter("ignore")
                 parser = PDBParser()
                 # Infer pdb_id from filename

@@ -430,7 +430,7 @@ class Protein:
         allowed_rows = self.df.res_full_id.apply(
             self._filter_het_rows(allowed_ligands, discard_water, True))
 
-        self.df = self.df.loc[~allowed_rows]
+        self.df = self.df.loc[allowed_rows]
 
     def extract_ligands(self, allowed_ligands, remove_from_df=True):
         """Extract and return ligand rows from dataframe, optionally
@@ -438,11 +438,12 @@ class Protein:
         if isinstance(allowed_ligands, str):
             allowed_ligands = [allowed_ligands]
 
-        ligand_rows = self.df.res_full_id.apply(
+        is_ligand = self.df.res_full_id.apply(
             self._filter_het_rows(allowed_ligands, True, False))
 
+        ligand_rows = self.df.loc[is_ligand]
         if remove_from_df:
-            self.df = self.df.loc[~ligand_rows]
+            self.df = self.df.loc[~is_ligand]
 
         return ligand_rows
 
